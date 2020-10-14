@@ -16,6 +16,9 @@
 		    (let ([proc-value (eval-exp rator env)]
 			  [args (eval-rands rands env)])
 		      (apply-proc proc-value args env))]
+     [if-one-exp (condition body)
+        (if (eval-exp condition env)
+            (eval-exp body env))]
 	   [if-exp (condition body1 body2)
 		   (if (eval-exp condition env)
 		       (eval-exp body1 env)
@@ -64,7 +67,7 @@
 			      list? pair? procedure? vector->list vector make-vector
 			      vector-ref vector? number? symbol? set-car! set-cdr!
 			      vector-set! display newline caar cadr cdar cddr caaar
-			      caadr cadar cdaar caddr cdadr cddar cdddr))
+			      caadr cadar cdaar caddr cdadr cddar cdddr map apply))
 
 (define init-env
   (extend-env
@@ -127,6 +130,8 @@
       [(cdadr) (apply cdadr args)]
       [(cddar) (apply cddar args)]
       [(cdddr) (apply cdddr args)]
+      [(map) (apply map args)]
+      [(apply) (apply apply args)]
       [else (error 'apply-prim-proc
 		   "Bad primitive procedure name: ~s"
 		   prim-op)])))

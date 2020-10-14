@@ -9,6 +9,9 @@
   [lambda-exp
    (vars (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
    (bodies (list-of expression?))]
+   [if-one-exp
+     (condtion expression?)
+     (body1 expression?)]
   [if-exp
    (condition expression?)
    (body1 expression?)

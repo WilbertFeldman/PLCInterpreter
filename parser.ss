@@ -17,14 +17,14 @@
      [(list? datum)
       (cond
        [(eqv? (1st datum) 'lambda)
-	(parse-lambda datum)]
+	             (parse-lambda datum)]
        [(equal? (1st datum) 'if)
-	(parse-if datum)]
+	            (parse-if datum)]
        [(and (equal? (1st datum) 'let)
-	     (and (not (null? (cdr datum))) (symbol? (2nd datum))))
-	(parse-named-let datum)]
+            	(and (not (null? (cdr datum))) (symbol? (2nd datum))))
+            	(parse-named-let datum)]
        [(equal? (1st datum) 'let)
-	(parse-let let-exp datum)]
+	           (parse-let let-exp datum)]
        [(equal? (1st datum) 'let*)
 	(parse-let let*-exp datum)]
        [(equal? (1st datum) 'letrec)
@@ -58,12 +58,15 @@
 		       (map parse-exp (cddr datum)))]
 	  [else
 	   (lambda-exp (2nd datum)
-		       (map parse-exp (cddr datum)))])]))
+		       (map parse-exp (cddr datum)))])]))  
 
 (define (parse-if datum)
   (cond
-   [(not (= (length datum) 4))
-    (eopl:error 'parse-exp "if requires 4 parts: cond, body1, body2. received: ~s" datum)]
+   [ (or (< (length datum) 3) (> (length datum) 4))
+    (eopl:error 'parse-exp "if requires at least 3 parts: cond, body1. received: ~s" datum)]
+   [(= (length datum) 3)
+    (if-one-exp (parse-exp (2nd datum))
+                (parse-exp (3rd datum)))]
    [else
     (if-exp (parse-exp (2nd datum))
 	    (parse-exp (3rd datum))
