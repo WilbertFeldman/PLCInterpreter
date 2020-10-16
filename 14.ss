@@ -41,7 +41,7 @@
    (rands (list-of expression?))]
   [case-exp
     (exps expression?)
-    (vals (list-of (list-of expression?)))
+    (vals (list-of (lambda (x) (or (expression? x) ((list-of expression?) x)))))
     (bodies (list-of (list-of expression?)))]
   [and-exp
     (bodies (list-of expression?))]
@@ -52,7 +52,10 @@
   [cond-exp
     (conds (list-of expression?))
     (bodies (list-of (list-of expression?)))]
-  [else-exp])
+  [else-exp]
+  [while-exp
+    (conds expression?)
+    (bodies (list-of expression?))])
 
 
 					;type helpers
@@ -163,6 +166,9 @@
 		      (eval-bodies bodies new-env))]
 	   [lambda-exp (vars bodies)
 		       (closure vars bodies env)]
+     [while-exp (conds bodies)
+      (if (eval-exp conds env)
+        (begin (eval-bodies bodies env) (eval-exp exp env)))]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 (define eval-bodies
@@ -359,6 +365,8 @@
         (parse-begin datum)]
        [(equal? (1st datum) 'cond)
         (parse-cond datum)]
+       [(equal? (1st datum) 'while)
+        (parse-while datum)]
        [else
 	(parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
@@ -444,7 +452,7 @@
   (app-exp (parse-exp (1st datum)) (map parse-exp (cdr datum))))
 
 (define (parse-case datum)
-  (case-exp (parse-exp (2nd datum)) (parse-cases (cddr datum)) (list (map (lambda (x) (parse-exp (car x))) (map cdr (cddr datum))))))
+  (case-exp (parse-exp (2nd datum)) (parse-cases (cddr datum)) (map (lambda (x) (map parse-exp x)) (map cdr (cddr datum)))))
 
 (define (parse-and datum)
   (and-exp (map parse-exp (cdr datum))))
@@ -456,7 +464,10 @@
   (begin-exp (map parse-exp (cdr datum))))
 
 (define (parse-cond datum)
-  (cond-exp (parse-conds (cdr datum)) (map (lambda (x) (list (parse-exp (car x)))) (map cdr (cdr datum)))))
+  (cond-exp (parse-conds (cdr datum)) (map (lambda (x) (map parse-exp x)) (map cdr (cdr datum)))))
+
+(define (parse-while datum)
+  (while-exp (parse-exp (2nd datum)) (map parse-exp (cddr datum))))
 
 (define (parse-conds datum)
   (cond

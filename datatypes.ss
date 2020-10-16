@@ -41,7 +41,7 @@
    (rands (list-of expression?))]
   [case-exp
     (exps expression?)
-    (vals (list-of (list-of expression?)))
+    (vals (list-of (lambda (x) (or (expression? x) ((list-of expression?) x)))))
     (bodies (list-of (list-of expression?)))]
   [and-exp
     (bodies (list-of expression?))]
@@ -52,7 +52,10 @@
   [cond-exp
     (conds (list-of expression?))
     (bodies (list-of (list-of expression?)))]
-  [else-exp])
+  [else-exp]
+  [while-exp
+    (conds expression?)
+    (bodies (list-of expression?))])
 
 
 					;type helpers

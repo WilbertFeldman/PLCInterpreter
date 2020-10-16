@@ -41,6 +41,8 @@
         (parse-begin datum)]
        [(equal? (1st datum) 'cond)
         (parse-cond datum)]
+       [(equal? (1st datum) 'while)
+        (parse-while datum)]
        [else
 	(parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
@@ -126,7 +128,7 @@
   (app-exp (parse-exp (1st datum)) (map parse-exp (cdr datum))))
 
 (define (parse-case datum)
-  (case-exp (parse-exp (2nd datum)) (parse-cases (cddr datum)) (list (map (lambda (x) (parse-exp (car x))) (map cdr (cddr datum))))))
+  (case-exp (parse-exp (2nd datum)) (parse-cases (cddr datum)) (map (lambda (x) (map parse-exp x)) (map cdr (cddr datum)))))
 
 (define (parse-and datum)
   (and-exp (map parse-exp (cdr datum))))
@@ -138,7 +140,10 @@
   (begin-exp (map parse-exp (cdr datum))))
 
 (define (parse-cond datum)
-  (cond-exp (parse-conds (cdr datum)) (map (lambda (x) (list (parse-exp (car x)))) (map cdr (cdr datum)))))
+  (cond-exp (parse-conds (cdr datum)) (map (lambda (x) (map parse-exp x)) (map cdr (cdr datum)))))
+
+(define (parse-while datum)
+  (while-exp (parse-exp (2nd datum)) (map parse-exp (cddr datum))))
 
 (define (parse-conds datum)
   (cond

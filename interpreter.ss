@@ -28,6 +28,9 @@
 		      (eval-bodies bodies new-env))]
 	   [lambda-exp (vars bodies)
 		       (closure vars bodies env)]
+     [while-exp (conds bodies)
+      (if (eval-exp conds env)
+        (begin (eval-bodies bodies env) (eval-exp exp env)))]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 (define eval-bodies
