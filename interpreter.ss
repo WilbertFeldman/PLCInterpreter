@@ -43,7 +43,7 @@
 (define apply-proc
   (lambda (proc-value args env)
     (cases proc-val proc-value
-	   [prim-proc (op) (apply-prim-proc op args)]
+	   [prim-proc (op) (apply-prim-proc op args env)]
 	   [closure (vars bodies env)
 		    (let ([new-env (add-lambda-variables-to-enviornment vars args env)])
 		      (eval-bodies bodies new-env))]
@@ -53,13 +53,26 @@
 
 ;; I want a better name for this
 (define (add-lambda-variables-to-enviornment vars args env)
-  (cond [(symbol? vars)
-	 (extend-env (list vars) (list args) env)]
-	[(list? vars)
-	 (extend-env vars args env)]
-	[else
-	 (display "I don't feel like handling this case rn")
-	 ]))
+  (cond
+    [(symbol? vars)
+	   (extend-env (list vars) (list args) env)]
+	  [(list? vars)
+	   (extend-env vars args env)]
+	  [else
+      (let ([list-of-vars (list-of-unknown-vars vars)])
+        (extend-env list-of-vars (list-of-unknown-args args (length list-of-vars)) env))]))
+
+(define list-of-unknown-vars
+  (lambda (vars)
+    (cond
+      [(not (pair? vars)) (list vars)]
+      [else (cons (car vars) (list-of-unknown-vars (cdr vars)))])))
+
+(define list-of-unknown-args
+  (lambda (args len)
+    (cond
+      [(= len 1) (list args)]
+      [else (cons (car args) (list-of-unknown-args (cdr args) (- len 1)))])))
 
 
 (define *prim-proc-names* '(+ - * / add1 sub1 = < > <= >= not zero? cons car cdr cddr
@@ -77,7 +90,7 @@
    (empty-env)))
 
 (define apply-prim-proc
-  (lambda (prim-proc args)
+  (lambda (prim-proc args env)
     (case prim-proc
       [(+) (apply + args)]
       [(-) (apply - args)]
@@ -105,7 +118,7 @@
       [(list->vector) (apply list->vector args)]
       [(list?) (apply list? args)]
       [(pair?) (apply pair? args)]
-      [(procedure?) (apply procedure? args)]
+      [(procedure?) (apply proc-val? args)]
       [(vector->list) (apply vector->list args)]
       [(vector) (apply vector args)]
       [(make-vector) (apply make-vector args)]
@@ -130,11 +143,29 @@
       [(cdadr) (apply cdadr args)]
       [(cddar) (apply cddar args)]
       [(cdddr) (apply cdddr args)]
-      [(map) (apply map args)]
-      [(apply) (apply apply args)]
+      [(map) (our-map (1st args) env (2nd args) (cddr args))]
+      [(apply) (our-apply (1st args) env (last args) (all-but-last (cdr args)))]
       [else (error 'apply-prim-proc
 		   "Bad primitive procedure name: ~s"
 		   prim-op)])))
+
+(define our-map
+  (lambda (proc env lst lsts)
+    (if (null? lst)  '()
+          (cons (apply-proc proc (cons (car lst) (map car lsts)) env)
+            (our-map proc env (cdr lst) (map cdr lsts))))))
+
+(define our-apply
+  (lambda (proc env lst objs)
+    (apply-proc proc (append objs lst) env)))
+
+(define last
+  (lambda (lst)
+    (car (reverse lst))))
+
+(define all-but-last
+  (lambda (lst)
+    (reverse (cdr (reverse lst)))))
 
 (define rep
   (lambda ()
@@ -142,6 +173,11 @@
     (let ([answer (top-level-eval (parse-exp (read)))])
       (eopl:pretty-print answer) (newline)
       (rep))))
+
+; (define syntax-expand
+;   (lambda (exp)
+;     (cases expression exp
+;       [])))
 
 (define eval-one-exp
   (lambda (x) (top-level-eval (parse-exp x))))

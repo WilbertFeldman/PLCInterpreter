@@ -38,7 +38,21 @@
    (body expression?)]
   [app-exp
    (rator expression?)
-   (rands (list-of expression?))])
+   (rands (list-of expression?))]
+  [case-exp
+    (exps expression?)
+    (vals (list-of (list-of expression?)))
+    (bodies (list-of (list-of expression?)))]
+  [and-exp
+    (bodies (list-of expression?))]
+  [or-exp
+    (bodies (list-of expression?))]
+  [begin-exp
+    (bodies (list-of expression?))]
+  [cond-exp
+    (conds (list-of expression?))
+    (bodies (list-of (list-of expression?)))]
+  [else-exp])
 
 
 					;type helpers

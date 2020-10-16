@@ -24,13 +24,23 @@
             	(and (not (null? (cdr datum))) (symbol? (2nd datum))))
             	(parse-named-let datum)]
        [(equal? (1st datum) 'let)
-	           (parse-let let-exp datum)]
+        (parse-let let-exp datum)]
        [(equal? (1st datum) 'let*)
-	(parse-let let*-exp datum)]
+      	(parse-let let*-exp datum)]
        [(equal? (1st datum) 'letrec)
-	(parse-let letrec-exp datum)]
+	      (parse-let letrec-exp datum)]
        [(equal? (1st datum) 'set!)
-	(parse-set! datum)]
+	      (parse-set! datum)]
+       [(equal? (1st datum) 'case)
+        (parse-case datum)]
+       [(equal? (1st datum) 'and)
+        (parse-and datum)]
+       [(equal? (1st datum) 'or)
+        (parse-or datum)]
+       [(equal? (1st datum) 'begin)
+        (parse-begin datum)]
+       [(equal? (1st datum) 'cond)
+        (parse-cond datum)]
        [else
 	(parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
@@ -58,7 +68,7 @@
 		       (map parse-exp (cddr datum)))]
 	  [else
 	   (lambda-exp (2nd datum)
-		       (map parse-exp (cddr datum)))])]))  
+		       (map parse-exp (cddr datum)))])]))
 
 (define (parse-if datum)
   (cond
@@ -114,6 +124,44 @@
 
 (define (parse-app datum)
   (app-exp (parse-exp (1st datum)) (map parse-exp (cdr datum))))
+
+(define (parse-case datum)
+  (case-exp (parse-exp (2nd datum)) (parse-cases (cddr datum)) (list (map (lambda (x) (parse-exp (car x))) (map cdr (cddr datum))))))
+
+(define (parse-and datum)
+  (and-exp (map parse-exp (cdr datum))))
+
+(define (parse-or datum)
+  (or-exp (map parse-exp (cdr datum))))
+
+(define (parse-begin datum)
+  (begin-exp (map parse-exp (cdr datum))))
+
+(define (parse-cond datum)
+  (cond-exp (parse-conds (cdr datum)) (map (lambda (x) (list (parse-exp (car x)))) (map cdr (cdr datum)))))
+
+(define (parse-conds datum)
+  (cond
+    [(null? datum) '()]
+    [else
+      (if (equal? (caar datum) 'else)
+        (if (null? (cdr datum))
+          (list (else-exp))
+          (eopl:error 'parse-exp "Conditions after else"))
+        (cons (parse-exp (caar datum)) (parse-conds (cdr datum))))]))
+
+(define (parse-cases datum)
+  (cond
+    [(null? datum) '()]
+    [else
+      (if (equal? (caar datum) 'else)
+        (if (null? (cdr datum))
+          (list (else-exp))
+          (eopl:error 'parse-exp "Conditions after else"))
+        (if (list? (caar datum))
+          (cons (map parse-exp (caar datum)) (parse-cases (cdr datum)))
+          (cons (parse-exp (caar datum)) (parse-cases (cdr datum)))))]))
+
 
 (define (improper-list-map proc list)
   (if (pair? x)
