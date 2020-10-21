@@ -1,11 +1,5 @@
 import os.path, time
-files = ['interpreter.ss', 'datatypes.ss', 'enviornment.ss', 'parser.ss']
-changes =  {
-	"interpreter.ss":os.path.getmtime("interpreter.ss"),
-	"datatypes.ss":os.path.getmtime("datatypes.ss"),
-	"enviornment.ss":os.path.getmtime("enviornment.ss"),
-	"parser.ss":os.path.getmtime("parser.ss")
-}
+files = ['datatypes.ss', 'enviornment.ss', 'interpreter.ss', 'parser.ss']
 changes = { file : os.path.getmtime(file) for file in files }
 while True:
 	for f in files:
