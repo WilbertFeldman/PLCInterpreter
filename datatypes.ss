@@ -85,7 +85,7 @@
   (empty-env-record)
   (extended-env-record
    (syms (list-of symbol?))
-   (vals (list-of scheme-value?))
+   (vals (lambda (x) (or ((list-of scheme-value?) x) (vector? x))))
    (env environment?)))
 
 					; datatype for procedures.  At first there is only one

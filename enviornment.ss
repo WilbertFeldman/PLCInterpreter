@@ -45,7 +45,7 @@
    (let ([len (length vars)])
      (let ([vec (make-vector len)])
        (let ([env (extended-env-record
-                   proc-names vec old-env)])
+                   vars vec old-env)])
          (for-each
             (lambda (pos val)
               (vector-set! vec

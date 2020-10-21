@@ -228,8 +228,6 @@
         (syntax-expand (expand-or (map syntax-expand bodies)))]
       [begin-exp (bodies)
         (app-exp (lambda-exp '() (map syntax-expand bodies)) '())]
-      [named-let-exp (name vars vals bodies)
-        ]
       [else
         exp])))
 

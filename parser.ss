@@ -112,9 +112,9 @@
 		   (and (list? x) (= 2 (length x)) (symbol? (1st x))))
 		 (2nd datum)))
     (eopl:error 'parse-exp "first elements must be symbols")]
-   [(symbol? (2nd datum)) (eopl:error 'parse-exp "let must be named")]
+   [(not (symbol? (2nd datum))) (eopl:error 'parse-exp "let must be named")]
    [else
-    (namedlet-exp (2nd datum)
+    (namedlet-exp (parse-exp (2nd datum))
 		  (map (lambda (x) (parse-exp (1st x))) (3rd datum))
 		  (map (lambda (x) (parse-exp (2nd x))) (3rd datum))
 		  (map parse-exp (cadddr datum)))]))

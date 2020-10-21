@@ -85,7 +85,7 @@
   (empty-env-record)
   (extended-env-record
    (syms (list-of symbol?))
-   (vals (list-of scheme-value?))
+   (vals (lambda (x) (or ((list-of scheme-value?) x) (vector? x))))
    (env environment?)))
 
 					; datatype for procedures.  At first there is only one
@@ -145,7 +145,7 @@
    (let ([len (length vars)])
      (let ([vec (make-vector len)])
        (let ([env (extended-env-record
-                   proc-names vec old-env)])
+                   vars vec old-env)])
          (for-each
             (lambda (pos val)
               (vector-set! vec
@@ -553,9 +553,9 @@
 		   (and (list? x) (= 2 (length x)) (symbol? (1st x))))
 		 (2nd datum)))
     (eopl:error 'parse-exp "first elements must be symbols")]
-   [(symbol? (2nd datum)) (eopl:error 'parse-exp "let must be named")]
+   [(not (symbol? (2nd datum))) (eopl:error 'parse-exp "let must be named")]
    [else
-    (namedlet-exp (2nd datum)
+    (namedlet-exp (parse-exp (2nd datum))
 		  (map (lambda (x) (parse-exp (1st x))) (3rd datum))
 		  (map (lambda (x) (parse-exp (2nd x))) (3rd datum))
 		  (map parse-exp (cadddr datum)))]))
