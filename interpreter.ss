@@ -236,8 +236,7 @@
 ;Helpers for syntax expand
 
 (define (expand-named-let name vars vals bodies)
-  (letrec-exp (cons name vars) (cons (lambda-exp vars bodies) vals) (list (app-exp (var-exp name) vals))))
-
+  (app-exp (letrec-exp (list name) (lambda-exp vars bodies) (list (var-exp name))) vals)
 
 (define (expand-and bodies)
   (if (null? bodies)

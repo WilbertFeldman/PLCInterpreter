@@ -22,7 +22,7 @@
 	   [extended-env-record (syms vals env)
 				(let ([pos (list-find-position sym syms)])
 				  (if (number? pos)
-				      (vector-ref vals pos)
+				      (list-ref vals pos)
 				      (eopl:error 'env "variable ~s not found." sym)))]
 	   [else (eopl:error 'env "Not extended-env-record")])))
 
@@ -35,7 +35,7 @@
 	   [extended-env-record (syms vals env)
 				(let ((pos (list-find-position sym syms)))
 				  (if (number? pos)
-				      (vector-ref vals pos)
+				      (list-ref vals pos)
 				      (apply-env env sym global-env)))])))
 
 
@@ -45,12 +45,12 @@
    (let ([len (length vars)])
      (let ([vec (make-vector len)])
        (let ([env (extended-env-record
-                   vars vec old-env)])
+                   proc-names vec old-env)])
          (for-each
             (lambda (pos val)
               (vector-set! vec
                            pos
-                           (eval-exp val env)))
+                           (eval-exp val env))))
             (iota len)
             vals)
-          env)))))
+          env))))
