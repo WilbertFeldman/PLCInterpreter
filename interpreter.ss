@@ -30,7 +30,7 @@
 		       (eval-exp body1 env)
 		       (eval-exp body2 env))]
 	   [let-exp (vars vals bodies)
-		    (let ([new-env (extend-env vars (map (lambda (x) (eval-exp x env)) vals) env)])
+		    (let ([new-env (extend-env vars (list->vector (map (lambda (x) (eval-exp x env)) vals)) env)])
 		      (eval-bodies bodies new-env))]
      [letrec-exp (vars vals bodies)
      (eval-bodies bodies (extend-env-recursively vars vals env))]
@@ -70,12 +70,12 @@
 (define (add-lambda-variables-to-enviornment vars args env)
   (cond
     [(symbol? vars)
-	   (extend-env (list vars) (list args) env)]
+	   (extend-env (list vars) (list->vector (list args)) env)]
 	  [(list? vars)
-	   (extend-env vars args env)]
+	   (extend-env vars (list->vector args) env)]
 	  [else
       (let ([list-of-vars (list-of-unknown-vars vars)])
-        (extend-env list-of-vars (list-of-unknown-args args (length list-of-vars)) env))]))
+        (extend-env list-of-vars (list->vector (list-of-unknown-args args (length list-of-vars))) env))]))
 
 (define list-of-unknown-vars
   (lambda (vars)
@@ -100,8 +100,8 @@
 (define init-env
   (extend-env
    *prim-proc-names*
-   (map prim-proc
-	*prim-proc-names*)
+   (list->vector (map prim-proc
+	*prim-proc-names*))
    (empty-env)))
 
 (define apply-prim-proc
@@ -196,8 +196,8 @@
 (define syntax-expand
   (lambda (exp)
     (cases expression exp
-      [lambda-exp (val bodies)
-        (lambda-exp val (map syntax-expand bodies))]
+      [lambda-exp (vals bodies)
+        (lambda-exp vals (map syntax-expand bodies))]
       [if-one-exp (condition body)
         (if-one-exp (syntax-expand condition)
           (syntax-expand body))]
@@ -228,10 +228,15 @@
         (syntax-expand (expand-or (map syntax-expand bodies)))]
       [begin-exp (bodies)
         (app-exp (lambda-exp '() (map syntax-expand bodies)) '())]
+      [namedlet-exp (name vars vals bodies)
+        (syntax-expand (expand-named-let name vars vals bodies))]
       [else
         exp])))
 
 ;Helpers for syntax expand
+
+(define (expand-named-let name vars vals bodies)
+  (letrec-exp (cons name vars) (cons (lambda-exp vars bodies) vals) (list (app-exp (var-exp name) vals))))
 
 
 (define (expand-and bodies)

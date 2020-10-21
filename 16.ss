@@ -30,7 +30,7 @@
    (vals (list-of expression?))
    (bodies (list-of expression?))]
   [namedlet-exp
-   (name var-exp?)
+   (name symbol?)
    (vars (list-of symbol?))
    (vals (list-of expression?))
    (bodies (list-of expression?))]
@@ -85,7 +85,7 @@
   (empty-env-record)
   (extended-env-record
    (syms (list-of symbol?))
-   (vals (lambda (x) (or ((list-of scheme-value?) x) (vector? x))))
+   (vals vector?)
    (env environment?)))
 
 					; datatype for procedures.  At first there is only one
@@ -122,7 +122,7 @@
 	   [extended-env-record (syms vals env)
 				(let ([pos (list-find-position sym syms)])
 				  (if (number? pos)
-				      (list-ref vals pos)
+				      (vector-ref vals pos)
 				      (eopl:error 'env "variable ~s not found." sym)))]
 	   [else (eopl:error 'env "Not extended-env-record")])))
 
@@ -135,7 +135,7 @@
 	   [extended-env-record (syms vals env)
 				(let ((pos (list-find-position sym syms)))
 				  (if (number? pos)
-				      (list-ref vals pos)
+				      (vector-ref vals pos)
 				      (apply-env env sym global-env)))])))
 
 
@@ -150,10 +150,10 @@
             (lambda (pos val)
               (vector-set! vec
                            pos
-                           (eval-exp val env))))
+                           (eval-exp val env)))
             (iota len)
             vals)
-          env))))
+          env)))))
 ; top-level-eval evaluates a form in the global environment
 ; A language can either be compiled or interpreted. Scheme is a language that can be interpreted.
 ;"Interpreted" means that it executes the code immediately without translating human-readable code to computer-readable bits.
@@ -186,7 +186,7 @@
 		       (eval-exp body1 env)
 		       (eval-exp body2 env))]
 	   [let-exp (vars vals bodies)
-		    (let ([new-env (extend-env vars (map (lambda (x) (eval-exp x env)) vals) env)])
+		    (let ([new-env (extend-env vars (list->vector (map (lambda (x) (eval-exp x env)) vals)) env)])
 		      (eval-bodies bodies new-env))]
      [letrec-exp (vars vals bodies)
      (eval-bodies bodies (extend-env-recursively vars vals env))]
@@ -226,12 +226,12 @@
 (define (add-lambda-variables-to-enviornment vars args env)
   (cond
     [(symbol? vars)
-	   (extend-env (list vars) (list args) env)]
+	   (extend-env (list vars) (list->vector (list args)) env)]
 	  [(list? vars)
-	   (extend-env vars args env)]
+	   (extend-env vars (list->vector args) env)]
 	  [else
       (let ([list-of-vars (list-of-unknown-vars vars)])
-        (extend-env list-of-vars (list-of-unknown-args args (length list-of-vars)) env))]))
+        (extend-env list-of-vars (list->vector (list-of-unknown-args args (length list-of-vars))) env))]))
 
 (define list-of-unknown-vars
   (lambda (vars)
@@ -256,8 +256,8 @@
 (define init-env
   (extend-env
    *prim-proc-names*
-   (map prim-proc
-	*prim-proc-names*)
+   (list->vector (map prim-proc
+	*prim-proc-names*))
    (empty-env)))
 
 (define apply-prim-proc
@@ -352,8 +352,8 @@
 (define syntax-expand
   (lambda (exp)
     (cases expression exp
-      [lambda-exp (val bodies)
-        (lambda-exp val (map syntax-expand bodies))]
+      [lambda-exp (vals bodies)
+        (lambda-exp vals (map syntax-expand bodies))]
       [if-one-exp (condition body)
         (if-one-exp (syntax-expand condition)
           (syntax-expand body))]
@@ -384,10 +384,15 @@
         (syntax-expand (expand-or (map syntax-expand bodies)))]
       [begin-exp (bodies)
         (app-exp (lambda-exp '() (map syntax-expand bodies)) '())]
+      [namedlet-exp (name vars vals bodies)
+        (syntax-expand (expand-named-let name vars vals bodies))]
       [else
         exp])))
 
 ;Helpers for syntax expand
+
+(define (expand-named-let name vars vals bodies)
+  (letrec-exp (cons name vars) (cons (lambda-exp vars bodies) vals) (list (app-exp (var-exp name) vals))))
 
 
 (define (expand-and bodies)
@@ -555,8 +560,8 @@
     (eopl:error 'parse-exp "first elements must be symbols")]
    [(not (symbol? (2nd datum))) (eopl:error 'parse-exp "let must be named")]
    [else
-    (namedlet-exp (parse-exp (2nd datum))
-		  (map (lambda (x) (parse-exp (1st x))) (3rd datum))
+    (namedlet-exp (2nd datum)
+		  (map 1st (3rd datum))
 		  (map (lambda (x) (parse-exp (2nd x))) (3rd datum))
 		  (map parse-exp (cadddr datum)))]))
 

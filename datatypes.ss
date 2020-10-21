@@ -30,7 +30,7 @@
    (vals (list-of expression?))
    (bodies (list-of expression?))]
   [namedlet-exp
-   (name var-exp?)
+   (name symbol?)
    (vars (list-of symbol?))
    (vals (list-of expression?))
    (bodies (list-of expression?))]
@@ -85,7 +85,7 @@
   (empty-env-record)
   (extended-env-record
    (syms (list-of symbol?))
-   (vals (lambda (x) (or ((list-of scheme-value?) x) (vector? x))))
+   (vals vector?)
    (env environment?)))
 
 					; datatype for procedures.  At first there is only one
