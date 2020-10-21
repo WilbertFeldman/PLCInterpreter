@@ -1,15 +1,21 @@
-					; top-level-eval evaluates a form in the global environment
+; top-level-eval evaluates a form in the global environment
+; A language can either be compiled or interpreted. Scheme is a language that can be interpreted.
+;"Interpreted" means that it executes the code immediately without translating human-readable code to computer-readable bits.
+
+;Creates the first empty environment
 (define top-level-eval
   (lambda (form)
     (eval-exp form (empty-env))))
 
+;Adds variables + values to given assignment. Also does the actual execution of code.
+;It checks if 'exp' is a certain type (eg. vars, ifs, etc) and then executes based off information provided.
 (define eval-exp
   (lambda (exp env)
     (cases expression exp
 	   [lit-exp (datum)
-		    (if (pair? datum)
-			(cadr datum)
-			datum)]
+		  (if (pair? datum)
+			   (cadr datum)
+			   datum)]
 	   [var-exp (id)
 		    (apply-env env id init-env)]
 	   [app-exp (rator rands)
@@ -26,12 +32,16 @@
 	   [let-exp (vars vals bodies)
 		    (let ([new-env (extend-env vars (map (lambda (x) (eval-exp x env)) vals) env)])
 		      (eval-bodies bodies new-env))]
+     [letrec-exp (vars vals bodies)
+     (eval-bodies bodies (extend-env-recursively vars vals env))]
 	   [lambda-exp (vars bodies)
 		       (closure vars bodies env)]
      [while-exp (conds bodies)
       (if (eval-exp conds env)
         (begin (eval-bodies bodies env) (eval-exp exp env)))]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
+
+
 
 (define eval-bodies
   (lambda (lst env)
@@ -43,6 +53,8 @@
   (lambda (rands env)
     (map (lambda (x) (eval-exp x env)) rands)))
 
+
+;Applying the actual procedure to elements.
 (define apply-proc
   (lambda (proc-value args env)
     (cases proc-val proc-value
@@ -179,6 +191,8 @@
       (eopl:pretty-print answer) (newline)
       (rep))))
 
+;Transforming more complex procedures to "core forms" (a.k.a. things you NEED in Scheme)
+;So that you can deal with less cases in eval-exp
 (define syntax-expand
   (lambda (exp)
     (cases expression exp
@@ -214,8 +228,13 @@
         (syntax-expand (expand-or (map syntax-expand bodies)))]
       [begin-exp (bodies)
         (app-exp (lambda-exp '() (map syntax-expand bodies)) '())]
+      [named-let-exp (name vars vals bodies)
+        ]
       [else
         exp])))
+
+;Helpers for syntax expand
+
 
 (define (expand-and bodies)
   (if (null? bodies)
@@ -262,5 +281,7 @@
           (if-exp (app-exp (var-exp 'equal?) (list exps (car vals))) (begin-exp (car bodies)) (expand-case exps (cdr vals) (cdr bodies)))])
       (if-exp (app-exp (var-exp 'member) (list exps (app-exp (var-exp 'list) (car vals)))) (begin-exp (car bodies)) (expand-case exps (cdr vals) (cdr bodies))))))
 
+
+;This is the start.
 (define eval-one-exp
   (lambda (x) (top-level-eval (syntax-expand (parse-exp x)))))

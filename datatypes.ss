@@ -1,7 +1,8 @@
 ;; Parsed expression datatype.  You will probably want to replace this
 ;; with your expression datatype from A11b.
 
-(define-datatype expression expression?
+;Defined all the different datatypes so that the parser can format what it sees into a type specified here.
+(define-datatype expression expression? ;Expression is a datatype. Expression? is a predicate that checks if the obj is an expression.
   [var-exp
    (id symbol?)]
   [lit-exp

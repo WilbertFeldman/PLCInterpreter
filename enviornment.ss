@@ -1,7 +1,7 @@
 ; Environment definitions for CSSE 304 Scheme interpreter.
 					; Based on EoPL sections 2.2 and  2.3
 
-(define empty-env 
+(define empty-env
   (lambda ()
     (empty-env-record)))
 
@@ -18,7 +18,7 @@
 
 (define apply-global-env
   (lambda (env sym)
-    (cases environment env
+    (cases environment env ;(cases name-of-datatype switch-val)
 	   [extended-env-record (syms vals env)
 				(let ([pos (list-find-position sym syms)])
 				  (if (number? pos)
@@ -37,3 +37,20 @@
 				  (if (number? pos)
 				      (list-ref vals pos)
 				      (apply-env env sym global-env)))])))
+
+
+
+(define extend-env-recursively
+ (lambda (vars vals old-env)
+   (let ([len (length vars)])
+     (let ([vec (make-vector len)])
+       (let ([env (extended-env-record
+                   proc-names vec old-env)])
+         (for-each
+            (lambda (pos val)
+              (vector-set! vec
+                           pos
+                           (eval-exp val env))))
+            (iota len)
+            vals)
+          env))))

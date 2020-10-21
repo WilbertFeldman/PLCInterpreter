@@ -3,10 +3,14 @@
 					; You will want to replace this with your parser that includes more expression types, more options for these types, and error-checking.
 
 					; Procedures to make the parser a little bit saner.
+
+
 (define 1st car)
 (define 2nd cadr)
 (define 3rd caddr)
 
+;The parser activates first. This makes human-readable code more familiar to the computer, making it easier to evaluate.
+;Eval-exp is easier to write thanks to parse-exp.
 (define parse-exp
   (lambda (datum)
     (cond
