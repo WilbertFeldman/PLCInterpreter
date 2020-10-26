@@ -5,7 +5,7 @@ while True:
 	for f in files:
 		if changes.get(f) < os.path.getmtime(f):
 			print (time.strftime("%H:%M:%S", time.localtime()))
-			with open('turnMeIn.ss', 'w') as outfile:
+			with open('exam2practice.ss', 'w') as outfile:
 				for fname in files:
 					with open(fname) as infile:
 						for line in infile:

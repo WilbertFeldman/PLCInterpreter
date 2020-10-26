@@ -90,12 +90,13 @@
       [else (cons (car args) (list-of-unknown-args (cdr args) (- len 1)))])))
 
 
-(define *prim-proc-names* '(+ - * / add1 sub1 = < > <= >= not zero? cons car cdr cddr
-			      list null? assq eq? equal? atom? length list->vector
+(define *prim-proc-names* '(+ - * / add1 sub1 = < > <= >= not zero? cons append car cdr cddr
+			      list null? assq eq? eqv? equal? atom? length list->vector
 			      list? pair? procedure? vector->list vector make-vector
 			      vector-ref vector? number? symbol? set-car! set-cdr!
 			      vector-set! display newline caar cadr cdar cddr caaar
-			      caadr cadar cdaar caddr cdadr cddar cdddr map apply quotient member))
+			      caadr cadar cdaar caddr cdadr cddar cdddr map apply quotient member
+            list-tail product))
 
 (define init-env
   (extend-env
@@ -121,17 +122,20 @@
       [(not) (apply not args)]
       [(zero?) (apply zero? args)]
       [(cons) (apply cons args)]
+      [(append) (apply append args)]
       [(car) (apply car args)]
       [(cdr) (apply cdr args)]
       [(list) args]
       [(null?) (apply null? args)]
       [(assq) (apply assq args)]
       [(eq?) (apply eq? args)]
+      [(eqv?) (apply eqv? args)]
       [(equal?) (apply equal? args)]
       [(atom?) (apply atom? args)]
       [(length) (apply length args)]
       [(list->vector) (apply list->vector args)]
       [(list?) (apply list? args)]
+      [(list-tail) (apply list-tail args)]
       [(pair?) (apply pair? args)]
       [(procedure?) (apply proc-val? args)]
       [(vector->list) (apply vector->list args)]
@@ -162,10 +166,18 @@
       [(apply) (our-apply (1st args) env (last args) (all-but-last (cdr args)))]
       [(quotient) (apply quotient args)]
       [(member) (apply member args)]
+      [(product) (apply product args)]
+      [(union) (apply union args)]
       [else (error 'apply-prim-proc
 		   "Bad primitive procedure name: ~s"
 		   prim-op)])))
 
+(define union ; s1 and s2 are sets of symbols.
+  (lambda (s1 s2)
+    (let loop ([s1 s1])
+      (cond [(null? s1) s2]
+            [(memq (car s1) s2) (loop (cdr s1))]
+            [else (cons (car s1) (loop (cdr s1)))]))))
 (define our-map
   (lambda (proc env lst lsts)
     (if (null? lst)  '()
@@ -209,6 +221,10 @@
         (app-exp (lambda-exp vars (map syntax-expand bodies)) (map syntax-expand vals))]
       [let*-exp (vars vals bodies)
         (syntax-expand (expand-let* vars vals bodies))]
+      [letrec-exp (vars vals bodies)
+        (letrec-exp vars (map syntax-expand vals) (map syntax-expand bodies))]
+      [namedlet-exp (name vars vals bodies)
+        (syntax-expand (expand-named-let name vars vals bodies))]
       [app-exp (rator rands)
         (app-exp (syntax-expand rator) (map syntax-expand rands))]
       [while-exp (conds bodies)
@@ -228,15 +244,30 @@
         (syntax-expand (expand-or (map syntax-expand bodies)))]
       [begin-exp (bodies)
         (app-exp (lambda-exp '() (map syntax-expand bodies)) '())]
-      [namedlet-exp (name vars vals bodies)
-        (syntax-expand (expand-named-let name vars vals bodies))]
+      ; [for-exp (dec conds inc bodies)
+      ;   (syntax-expand (expand-for dec conds inc bodies))]
       [else
         exp])))
 
 ;Helpers for syntax expand
 
+; (define (expand-for dec conds inc bodies)
+;   (cond
+;     [(and (null? dec) (null? inc)) (begin-exp (list (namedlet-exp 'for-loop '() '() (list (if-one-exp conds
+;                                                                     (begin-exp (list (begin-exp bodies) (app-exp (var-exp 'for-loop) '())))
+;                                                                     )))))]
+;     [(null? dec) (begin-exp (list (namedlet-exp 'for-loop '() '() (list (if-one-exp conds
+;                                                                     (begin-exp (list (begin-exp bodies) (begin-exp inc) (app-exp (var-exp 'for-loop) '())))
+;                                                                     )))))]
+;     [(null? inc) (begin-exp (list (begin-exp dec) (namedlet-exp 'for-loop '() '() (list (if-one-exp conds
+;                                                                     (begin-exp (list (begin-exp bodies) (app-exp (var-exp 'for-loop) '())))
+;                                                                     )))))]
+;     [else (begin-exp (list (begin-exp dec) (namedlet-exp 'for-loop '() '() (list (if-one-exp conds
+;                                                                     (begin-exp (list (begin-exp bodies) (begin-exp inc) (app-exp (var-exp 'for-loop) '())))
+;                                                                     )))))]))
+
 (define (expand-named-let name vars vals bodies)
-  (app-exp (letrec-exp (list name) (lambda-exp vars bodies) (list (var-exp name))) vals)
+  (app-exp (letrec-exp (list name) (list (lambda-exp vars bodies)) (list (var-exp name))) vals))
 
 (define (expand-and bodies)
   (if (null? bodies)

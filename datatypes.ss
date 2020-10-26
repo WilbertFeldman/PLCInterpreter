@@ -57,6 +57,11 @@
   [while-exp
     (conds expression?)
     (bodies (list-of expression?))])
+  ; [for-exp
+  ;   (dec (list-of expression?))
+  ;   (cond expression?)
+  ;   (inc (list-of expression?))
+  ;   (bodies (list-of expression?))])
 
 
 					;type helpers

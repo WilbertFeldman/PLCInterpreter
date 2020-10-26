@@ -57,6 +57,11 @@
   [while-exp
     (conds expression?)
     (bodies (list-of expression?))])
+  ; [for-exp
+  ;   (dec (list-of expression?))
+  ;   (cond expression?)
+  ;   (inc (list-of expression?))
+  ;   (bodies (list-of expression?))])
 
 
 					;type helpers
@@ -195,10 +200,6 @@
      [while-exp (conds bodies)
       (if (eval-exp conds env)
         (begin (eval-bodies bodies env) (eval-exp exp env)))]
-     [for-exp (cond bodies)
-      (if (cadr cond)
-          ()
-          (begin (eval-bodies bodies env) )]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 
@@ -404,14 +405,27 @@
         (syntax-expand (expand-or (map syntax-expand bodies)))]
       [begin-exp (bodies)
         (app-exp (lambda-exp '() (map syntax-expand bodies)) '())]
-      [for-exp (dec cond inc bodies)
-        (syntax-expand (begin-exp (list dec (namedlet-exp 'for-loop '() '() (if-one-exp cond
-                                                                        (begin-exp (list (begin-exp bodies) (begin-exp inc) (app-exp 'for-loop)))
-                                                                        ))))]
+      ; [for-exp (dec conds inc bodies)
+      ;   (syntax-expand (expand-for dec conds inc bodies))]
       [else
         exp])))
 
 ;Helpers for syntax expand
+
+; (define (expand-for dec conds inc bodies)
+;   (cond
+;     [(and (null? dec) (null? inc)) (begin-exp (list (namedlet-exp 'for-loop '() '() (list (if-one-exp conds
+;                                                                     (begin-exp (list (begin-exp bodies) (app-exp (var-exp 'for-loop) '())))
+;                                                                     )))))]
+;     [(null? dec) (begin-exp (list (namedlet-exp 'for-loop '() '() (list (if-one-exp conds
+;                                                                     (begin-exp (list (begin-exp bodies) (begin-exp inc) (app-exp (var-exp 'for-loop) '())))
+;                                                                     )))))]
+;     [(null? inc) (begin-exp (list (begin-exp dec) (namedlet-exp 'for-loop '() '() (list (if-one-exp conds
+;                                                                     (begin-exp (list (begin-exp bodies) (app-exp (var-exp 'for-loop) '())))
+;                                                                     )))))]
+;     [else (begin-exp (list (begin-exp dec) (namedlet-exp 'for-loop '() '() (list (if-one-exp conds
+;                                                                     (begin-exp (list (begin-exp bodies) (begin-exp inc) (app-exp (var-exp 'for-loop) '())))
+;                                                                     )))))]))
 
 (define (expand-named-let name vars vals bodies)
   (app-exp (letrec-exp (list name) (list (lambda-exp vars bodies)) (list (var-exp name))) vals))
@@ -510,27 +524,27 @@
         (parse-or datum)]
        [(equal? (1st datum) 'begin)
         (parse-begin datum)]
-       [(equal? (1st datum) 'cond)  
+       [(equal? (1st datum) 'cond)
         (parse-cond datum)]
        [(equal? (1st datum) 'while)
         (parse-while datum)]
-       [(equal? (1st datum) 'for)
-        (parse-for datum)]
+       ; [(equal? (1st datum) 'for)
+       ;  (parse-for datum)]
        [else
 	      (parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
 
-(define (parse-for datum)
-  (cond
-    [(> 3 (length datum))
-      (eopl:error 'parse-exp "improperly formated for expected >2 parts: ~s" datum)]
-    [(> 4 (length (cadr datum)))
-      (eopl:error 'parse-exp "improperly formated conditional expected >3 parts: ~s" datum)]
-    [else
-     (for-exp (parse-exp (car (1st datum)))
-              (parse-exp (caddr (1st datum)))
-              (parse-exp (cdddr (1st datum)))
-              (map parse-exp cddr))]))
+; (define (parse-for datum)
+;   (cond
+;     [(> 3 (length datum))
+;       (eopl:error 'parse-exp "improperly formated for expected >2 parts: ~s" datum)]
+;     [(> 4 (length (cadr datum)))
+;       (eopl:error 'parse-exp "improperly formated conditional expected >3 parts: ~s" datum)]
+;     [else
+;      (for-exp (map parse-exp (car (2nd datum)))
+;               (parse-exp (caddr (2nd datum)))
+;               (map parse-exp (cddddr (2nd datum)))
+;               (map parse-exp (cddr datum)))]))
 
 (define (valid-vars vars)
   (cond [(list? vars)

@@ -175,7 +175,7 @@
 	   [var-exp (id)
 		    (apply-env env id init-env)]
 	   [app-exp (rator rands)
-		    (let ([proc-value (eval-exp rator env)]
+		    (let ([proc-value (eval-exp rator env)] 
 			  [args (eval-rands rands env)])
 		      (apply-proc proc-value args env))]
      [if-one-exp (condition body)
@@ -195,10 +195,6 @@
      [while-exp (conds bodies)
       (if (eval-exp conds env)
         (begin (eval-bodies bodies env) (eval-exp exp env)))]
-     [for-exp (cond bodies)
-      (if (cadr cond)
-          ()
-          (begin (eval-bodies bodies env) )]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 

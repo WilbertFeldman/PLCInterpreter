@@ -47,9 +47,23 @@
         (parse-cond datum)]
        [(equal? (1st datum) 'while)
         (parse-while datum)]
+       ; [(equal? (1st datum) 'for)
+       ;  (parse-for datum)]
        [else
-	(parse-app datum)])]
+	      (parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
+
+; (define (parse-for datum)
+;   (cond
+;     [(> 3 (length datum))
+;       (eopl:error 'parse-exp "improperly formated for expected >2 parts: ~s" datum)]
+;     [(> 4 (length (cadr datum)))
+;       (eopl:error 'parse-exp "improperly formated conditional expected >3 parts: ~s" datum)]
+;     [else
+;      (for-exp (map parse-exp (car (2nd datum)))
+;               (parse-exp (caddr (2nd datum)))
+;               (map parse-exp (cddddr (2nd datum)))
+;               (map parse-exp (cddr datum)))]))
 
 (define (valid-vars vars)
   (cond [(list? vars)
@@ -117,7 +131,7 @@
     (namedlet-exp (2nd datum)
 		  (map 1st (3rd datum))
 		  (map (lambda (x) (parse-exp (2nd x))) (3rd datum))
-		  (map parse-exp (cadddr datum)))]))
+		  (map parse-exp (cdddr datum)))]))
 
 (define (parse-set! datum)
   (cond
