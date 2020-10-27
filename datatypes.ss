@@ -56,13 +56,17 @@
   [else-exp]
   [while-exp
     (conds expression?)
-    (bodies (list-of expression?))])
-  ; [for-exp
-  ;   (dec (list-of expression?))
-  ;   (cond expression?)
-  ;   (inc (list-of expression?))
-  ;   (bodies (list-of expression?))])
-
+    (bodies (list-of expression?))]
+  [when-exp
+    (condition expression?)
+    (bodies (list-of expression?))]
+  [define-exp
+    (var symbol?)
+    (body expression?)]
+  ; [dowhile-exp
+  ;   (conds expression?)
+  ;   (bodies (list-of expression?))]
+  )
 
 					;type helpers
 (define var-exp?

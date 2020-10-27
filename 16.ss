@@ -56,8 +56,17 @@
   [else-exp]
   [while-exp
     (conds expression?)
-    (bodies (list-of expression?))])
-
+    (bodies (list-of expression?))]
+  [when-exp
+    (condition expression?)
+    (bodies (list-of expression?))]
+  [define-exp
+    (var symbol?)
+    (body expression?)]
+  ; [dowhile-exp
+  ;   (conds expression?)
+  ;   (bodies (list-of expression?))]
+  )
 
 					;type helpers
 (define var-exp?
@@ -189,25 +198,51 @@
 		    (let ([new-env (extend-env vars (list->vector (map (lambda (x) (eval-exp x env)) vals)) env)])
 		      (eval-bodies bodies new-env))]
      [letrec-exp (vars vals bodies)
-     (eval-bodies bodies (extend-env-recursively vars vals env))]
+        (handle-defines bodies (extend-env-recursively vars vals env))]
 	   [lambda-exp (vars bodies)
 		       (closure vars bodies env)]
      [while-exp (conds bodies)
       (if (eval-exp conds env)
         (begin (eval-bodies bodies env) (eval-exp exp env)))]
-     [for-exp (cond bodies)
-      (if (cadr cond)
-          ()
-          (begin (eval-bodies bodies env) )]
+    ; [when-exp (conds bodies)
+    ;  (if (eval-exp conds env)
+    ;    (begin (eval-bodies bodies env)))]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 
+(define handle-defines
+  (lambda (lst env)
+    (eval-bodies (n-cdr lst (length (get-define-names lst)))
+      (extend-env-recursively (get-define-names lst) (get-define-bodies lst env) env))))
+
+(define n-cdr
+  (lambda (lst n)
+    (cond
+      [(equal? n 0) lst]
+      [else (n-cdr (cdr lst) (- n 1))])))
+
+(define get-define-names
+  (lambda (lst)
+    (cases expression (car lst)
+      [define-exp (var body)
+        (cons var (get-define-names (cdr lst)))]
+      [else
+        '()])))
+
+(define get-define-bodies
+  (lambda (lst env)
+    (cases expression (car lst)
+      [define-exp (var body)
+        (cons body (get-define-bodies (cdr lst) env))]
+      [else
+        '()])))
 
 (define eval-bodies
   (lambda (lst env)
-    (cond
-     [(null? (cdr lst)) (eval-exp (car lst) env)]
-     [else (eval-exp (car lst) env) (eval-bodies (cdr lst) env)])))
+      (cond
+       [(null? (cdr lst)) (eval-exp (car lst) env)]
+       [else (eval-exp (car lst) env) (eval-bodies (cdr lst) env)])))
+
 
 (define eval-rands
   (lambda (rands env)
@@ -221,7 +256,7 @@
 	   [prim-proc (op) (apply-prim-proc op args env)]
 	   [closure (vars bodies env)
 		    (let ([new-env (add-lambda-variables-to-enviornment vars args env)])
-		      (eval-bodies bodies new-env))]
+		      (handle-defines bodies new-env))]
 	   [else (error 'apply-proc
 			"Attempt to apply bad procedure: ~s"
 			proc-value)])))
@@ -404,14 +439,9 @@
         (syntax-expand (expand-or (map syntax-expand bodies)))]
       [begin-exp (bodies)
         (app-exp (lambda-exp '() (map syntax-expand bodies)) '())]
-      [for-exp (dec cond inc bodies)
-        (syntax-expand (begin-exp (list dec (namedlet-exp 'for-loop '() '() (if-one-exp cond
-                                                                        (begin-exp (list (begin-exp bodies) (begin-exp inc) (app-exp 'for-loop)))
-                                                                        ))))]
       [else
         exp])))
 
-;Helpers for syntax expand
 
 (define (expand-named-let name vars vals bodies)
   (app-exp (letrec-exp (list name) (list (lambda-exp vars bodies)) (list (var-exp name))) vals))
@@ -510,27 +540,26 @@
         (parse-or datum)]
        [(equal? (1st datum) 'begin)
         (parse-begin datum)]
-       [(equal? (1st datum) 'cond)  
+       [(equal? (1st datum) 'cond)
         (parse-cond datum)]
        [(equal? (1st datum) 'while)
         (parse-while datum)]
-       [(equal? (1st datum) 'for)
-        (parse-for datum)]
+       [(equal? (1st datum) 'when)
+        (parse-when datum)]
+      [(equal? (1st datum) 'define)
+        (parse-define datum)]
+      ; [equal? (1st datum) 'dowhile
+      ;   (dowhile-exp (parse-exp (2nd datum)) (map parse-exp (cddr datum)))]
        [else
 	      (parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
 
-(define (parse-for datum)
-  (cond
-    [(> 3 (length datum))
-      (eopl:error 'parse-exp "improperly formated for expected >2 parts: ~s" datum)]
-    [(> 4 (length (cadr datum)))
-      (eopl:error 'parse-exp "improperly formated conditional expected >3 parts: ~s" datum)]
-    [else
-     (for-exp (parse-exp (car (1st datum)))
-              (parse-exp (caddr (1st datum)))
-              (parse-exp (cdddr (1st datum)))
-              (map parse-exp cddr))]))
+
+(define (parse-define datum)
+  (define-exp (2nd datum) (parse-exp (3rd datum))))
+
+(define (parse-when datum)
+  (when-exp (parse-exp (2nd datum)) (map parse-exp (cddr datum))))
 
 (define (valid-vars vars)
   (cond [(list? vars)
