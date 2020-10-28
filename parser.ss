@@ -1,13 +1,7 @@
-					; This is a parser for simple Scheme expressions, such as those in EOPL, 3.1 thru 3.3.
-
-					; You will want to replace this with your parser that includes more expression types, more options for these types, and error-checking.
-
-					; Procedures to make the parser a little bit saner.
-
-
 (define 1st car)
 (define 2nd cadr)
 (define 3rd caddr)
+(define 4th cadddr)
 
 ;The parser activates first. This makes human-readable code more familiar to the computer, making it easier to evaluate.
 ;Eval-exp is easier to write thanks to parse-exp.
@@ -47,22 +41,11 @@
         (parse-cond datum)]
        [(equal? (1st datum) 'while)
         (parse-while datum)]
-       [(equal? (1st datum) 'when)
-        (parse-when datum)]
-      [(equal? (1st datum) 'define)
-        (parse-define datum)]
-      ; [equal? (1st datum) 'dowhile
-      ;   (dowhile-exp (parse-exp (2nd datum)) (map parse-exp (cddr datum)))]
+       [(equal? (1st datum) 'for)
+         (parse-for datum)]
        [else
-	      (parse-app datum)])]
+	(parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
-
-
-(define (parse-define datum)
-  (define-exp (2nd datum) (parse-exp (3rd datum))))
-
-(define (parse-when datum)
-  (when-exp (parse-exp (2nd datum)) (map parse-exp (cddr datum))))
 
 (define (valid-vars vars)
   (cond [(list? vars)

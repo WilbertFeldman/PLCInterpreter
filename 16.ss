@@ -57,16 +57,12 @@
   [while-exp
     (conds expression?)
     (bodies (list-of expression?))]
-  [when-exp
-    (condition expression?)
-    (bodies (list-of expression?))]
-  [define-exp
-    (var symbol?)
-    (body expression?)]
-  ; [dowhile-exp
-  ;   (conds expression?)
-  ;   (bodies (list-of expression?))]
-  )
+  [for-exp
+    (var var-exp?)
+    (crement expression?)
+    (val expression?)
+    (bodies (list-of expression?))])
+
 
 					;type helpers
 (define var-exp?
@@ -107,6 +103,9 @@
    (args (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
    (bodies (list-of expression?))
    (env environment?)])
+
+
+; Environment definitions for CSSE 304 Scheme interpreter.
 ; Environment definitions for CSSE 304 Scheme interpreter.
 					; Based on EoPL sections 2.2 and  2.3
 
@@ -198,51 +197,21 @@
 		    (let ([new-env (extend-env vars (list->vector (map (lambda (x) (eval-exp x env)) vals)) env)])
 		      (eval-bodies bodies new-env))]
      [letrec-exp (vars vals bodies)
-        (handle-defines bodies (extend-env-recursively vars vals env))]
+     (eval-bodies bodies (extend-env-recursively vars vals env))]
 	   [lambda-exp (vars bodies)
 		       (closure vars bodies env)]
      [while-exp (conds bodies)
       (if (eval-exp conds env)
         (begin (eval-bodies bodies env) (eval-exp exp env)))]
-    ; [when-exp (conds bodies)
-    ;  (if (eval-exp conds env)
-    ;    (begin (eval-bodies bodies env)))]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 
-(define handle-defines
-  (lambda (lst env)
-    (eval-bodies (n-cdr lst (length (get-define-names lst)))
-      (extend-env-recursively (get-define-names lst) (get-define-bodies lst env) env))))
-
-(define n-cdr
-  (lambda (lst n)
-    (cond
-      [(equal? n 0) lst]
-      [else (n-cdr (cdr lst) (- n 1))])))
-
-(define get-define-names
-  (lambda (lst)
-    (cases expression (car lst)
-      [define-exp (var body)
-        (cons var (get-define-names (cdr lst)))]
-      [else
-        '()])))
-
-(define get-define-bodies
-  (lambda (lst env)
-    (cases expression (car lst)
-      [define-exp (var body)
-        (cons body (get-define-bodies (cdr lst) env))]
-      [else
-        '()])))
 
 (define eval-bodies
   (lambda (lst env)
-      (cond
-       [(null? (cdr lst)) (eval-exp (car lst) env)]
-       [else (eval-exp (car lst) env) (eval-bodies (cdr lst) env)])))
-
+    (cond
+     [(null? (cdr lst)) (eval-exp (car lst) env)]
+     [else (eval-exp (car lst) env) (eval-bodies (cdr lst) env)])))
 
 (define eval-rands
   (lambda (rands env)
@@ -256,7 +225,7 @@
 	   [prim-proc (op) (apply-prim-proc op args env)]
 	   [closure (vars bodies env)
 		    (let ([new-env (add-lambda-variables-to-enviornment vars args env)])
-		      (handle-defines bodies new-env))]
+		      (eval-bodies bodies new-env))]
 	   [else (error 'apply-proc
 			"Attempt to apply bad procedure: ~s"
 			proc-value)])))
@@ -439,9 +408,17 @@
         (syntax-expand (expand-or (map syntax-expand bodies)))]
       [begin-exp (bodies)
         (app-exp (lambda-exp '() (map syntax-expand bodies)) '())]
+      [for-exp (var crement val bodies)
+       (syntax-expand (expand-for var crement val bodies))]
       [else
         exp])))
 
+;Helpers for syntax expand
+
+(define (expand-for var first final bodies)
+    (let-exp (list first var) (list var (var-exp 'final))
+                        (list (while-exp (app-exp (var-exp '<=) (list var (var-exp 'final)))
+                                         (list (begin-exp (list bodies (set!-exp var (app-exp (var-exp '+) (list var (lit-exp 1)))))))))))
 
 (define (expand-named-let name vars vals bodies)
   (app-exp (letrec-exp (list name) (list (lambda-exp vars bodies)) (list (var-exp name))) vals))
@@ -495,16 +472,10 @@
 ;This is the start.
 (define eval-one-exp
   (lambda (x) (top-level-eval (syntax-expand (parse-exp x)))))
-					; This is a parser for simple Scheme expressions, such as those in EOPL, 3.1 thru 3.3.
-
-					; You will want to replace this with your parser that includes more expression types, more options for these types, and error-checking.
-
-					; Procedures to make the parser a little bit saner.
-
-
 (define 1st car)
 (define 2nd cadr)
 (define 3rd caddr)
+(define 4th cadddr)
 
 ;The parser activates first. This makes human-readable code more familiar to the computer, making it easier to evaluate.
 ;Eval-exp is easier to write thanks to parse-exp.
@@ -544,22 +515,18 @@
         (parse-cond datum)]
        [(equal? (1st datum) 'while)
         (parse-while datum)]
-       [(equal? (1st datum) 'when)
-        (parse-when datum)]
-      [(equal? (1st datum) 'define)
-        (parse-define datum)]
-      ; [equal? (1st datum) 'dowhile
-      ;   (dowhile-exp (parse-exp (2nd datum)) (map parse-exp (cddr datum)))]
+       [(equal? (1st datum) 'for)
+         (parse-for datum)]
        [else
-	      (parse-app datum)])]
+	(parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
 
+(define (parse-for datum)
+    (for-exp (parse-exp (2nd datum))
+             (parse-exp (4th datum))
+             (parse-exp (cadr (cddddr datum)))
+             (map parse-exp (cdddr (cddddr datum)))))
 
-(define (parse-define datum)
-  (define-exp (2nd datum) (parse-exp (3rd datum))))
-
-(define (parse-when datum)
-  (when-exp (parse-exp (2nd datum)) (map parse-exp (cddr datum))))
 
 (define (valid-vars vars)
   (cond [(list? vars)

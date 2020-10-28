@@ -33,51 +33,21 @@
 		    (let ([new-env (extend-env vars (list->vector (map (lambda (x) (eval-exp x env)) vals)) env)])
 		      (eval-bodies bodies new-env))]
      [letrec-exp (vars vals bodies)
-        (handle-defines bodies (extend-env-recursively vars vals env))]
+     (eval-bodies bodies (extend-env-recursively vars vals env))]
 	   [lambda-exp (vars bodies)
 		       (closure vars bodies env)]
      [while-exp (conds bodies)
       (if (eval-exp conds env)
         (begin (eval-bodies bodies env) (eval-exp exp env)))]
-    ; [when-exp (conds bodies)
-    ;  (if (eval-exp conds env)
-    ;    (begin (eval-bodies bodies env)))]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 
-(define handle-defines
-  (lambda (lst env)
-    (eval-bodies (n-cdr lst (length (get-define-names lst)))
-      (extend-env-recursively (get-define-names lst) (get-define-bodies lst env) env))))
-
-(define n-cdr
-  (lambda (lst n)
-    (cond
-      [(equal? n 0) lst]
-      [else (n-cdr (cdr lst) (- n 1))])))
-
-(define get-define-names
-  (lambda (lst)
-    (cases expression (car lst)
-      [define-exp (var body)
-        (cons var (get-define-names (cdr lst)))]
-      [else
-        '()])))
-
-(define get-define-bodies
-  (lambda (lst env)
-    (cases expression (car lst)
-      [define-exp (var body)
-        (cons body (get-define-bodies (cdr lst) env))]
-      [else
-        '()])))
 
 (define eval-bodies
   (lambda (lst env)
-      (cond
-       [(null? (cdr lst)) (eval-exp (car lst) env)]
-       [else (eval-exp (car lst) env) (eval-bodies (cdr lst) env)])))
-
+    (cond
+     [(null? (cdr lst)) (eval-exp (car lst) env)]
+     [else (eval-exp (car lst) env) (eval-bodies (cdr lst) env)])))
 
 (define eval-rands
   (lambda (rands env)
@@ -91,7 +61,7 @@
 	   [prim-proc (op) (apply-prim-proc op args env)]
 	   [closure (vars bodies env)
 		    (let ([new-env (add-lambda-variables-to-enviornment vars args env)])
-		      (handle-defines bodies new-env))]
+		      (eval-bodies bodies new-env))]
 	   [else (error 'apply-proc
 			"Attempt to apply bad procedure: ~s"
 			proc-value)])))
@@ -277,6 +247,7 @@
       [else
         exp])))
 
+;Helpers for syntax expand
 
 (define (expand-named-let name vars vals bodies)
   (app-exp (letrec-exp (list name) (list (lambda-exp vars bodies)) (list (var-exp name))) vals))

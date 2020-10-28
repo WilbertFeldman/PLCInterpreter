@@ -56,17 +56,8 @@
   [else-exp]
   [while-exp
     (conds expression?)
-    (bodies (list-of expression?))]
-  [when-exp
-    (condition expression?)
-    (bodies (list-of expression?))]
-  [define-exp
-    (var symbol?)
-    (body expression?)]
-  ; [dowhile-exp
-  ;   (conds expression?)
-  ;   (bodies (list-of expression?))]
-  )
+    (bodies (list-of expression?))])
+
 
 					;type helpers
 (define var-exp?
@@ -107,3 +98,6 @@
    (args (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
    (bodies (list-of expression?))
    (env environment?)])
+
+
+; Environment definitions for CSSE 304 Scheme interpreter.
