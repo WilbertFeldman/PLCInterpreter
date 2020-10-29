@@ -8,7 +8,7 @@
 (define extend-env
   (lambda (syms vals env)
     (extended-env-record syms vals env)))
- 
+
 (define list-find-position
   (lambda (sym los)
     (let loop ([los los] [pos 0])
@@ -38,6 +38,26 @@
 				      (vector-ref vals pos)
 				      (apply-env env sym global-env)))])))
 
+
+(define set-val
+  (lambda (env sym val)
+    (cases environment env
+     [empty-env-record ()
+        (define-val sym val init-env)]
+     [extended-env-record (syms vals env)
+        (let ((pos (list-find-position sym syms)))
+          (if (number? pos)
+              (vector-set! vals pos val)
+              (set-val env sym val)))])))
+
+
+(define define-val
+  (lambda (var val env)
+    (cases environment env
+      [empty-env-record ()
+         (eopl:error 'env "Wrong2")]
+      [extended-env-record (syms vals env)
+        (set! init-env (extended-env-record (cons var syms) (list->vector (cons val (vector->list vals))) (empty-env)))])))
 
 
 (define extend-env-recursively

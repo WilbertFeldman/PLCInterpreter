@@ -35,7 +35,7 @@
    (vals (list-of expression?))
    (bodies (list-of expression?))]
   [set!-exp
-   (var var-exp?)
+   (var symbol?)
    (body expression?)]
   [app-exp
    (rator expression?)
@@ -56,7 +56,10 @@
   [else-exp]
   [while-exp
     (conds expression?)
-    (bodies (list-of expression?))])
+    (bodies (list-of expression?))]
+  [define-exp
+    (val symbol?)
+    (body expression?)])
 
 
 					;type helpers

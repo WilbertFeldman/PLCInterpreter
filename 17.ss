@@ -35,7 +35,7 @@
    (vals (list-of expression?))
    (bodies (list-of expression?))]
   [set!-exp
-   (var var-exp?)
+   (var symbol?)
    (body expression?)]
   [app-exp
    (rator expression?)
@@ -56,7 +56,10 @@
   [else-exp]
   [while-exp
     (conds expression?)
-    (bodies (list-of expression?))])
+    (bodies (list-of expression?))]
+  [define-exp
+    (val symbol?)
+    (body expression?)])
 
 
 					;type helpers
@@ -146,13 +149,21 @@
   (lambda (env sym val)
     (cases environment env
      [empty-env-record ()
-        (eopl:error 'env "Wrong")]
+        (define-val sym val init-env)]
      [extended-env-record (syms vals env)
         (let ((pos (list-find-position sym syms)))
           (if (number? pos)
               (vector-set! vals pos val)
-              (set-val env sym vals)))])))
+              (set-val env sym val)))])))
 
+
+(define define-val
+  (lambda (var val env)
+    (cases environment env
+      [empty-env-record ()
+         (eopl:error 'env "Wrong2")]
+      [extended-env-record (syms vals env)
+        (set! init-env (extended-env-record (cons var syms) (list->vector (cons val (vector->list vals))) (empty-env)))])))
 
 
 (define extend-env-recursively
@@ -183,10 +194,10 @@
 (define eval-exp
   (lambda (exp env)
     (cases expression exp
-	   [lit-exp (datum)
-		  (if (pair? datum)
-			   (cadr datum)
-			   datum)]
+      [lit-exp (datum)
+		    (if (pair? datum)
+			     (cadr datum)
+			      datum)]
 	   [var-exp (id)
 		    (apply-env env id init-env)]
 	   [app-exp (rator rands)
@@ -211,7 +222,9 @@
       (if (eval-exp conds env)
         (begin (eval-bodies bodies env) (eval-exp exp env)))]
      [set!-exp (var val)
-      (set-vals env var val)]
+      (set-val env var (eval-exp val env))]
+     [define-exp (var body)
+      (define-val var (eval-exp body env) init-env)]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 
@@ -271,12 +284,20 @@
 			      caadr cadar cdaar caddr cdadr cddar cdddr map apply quotient member
             list-tail product))
 
+
+(define make-init-env
+  (lambda ()
+   (extend-env
+    *prim-proc-names*
+    (list->vector (map prim-proc
+   *prim-proc-names*))
+    (empty-env))))
+
 (define init-env
-  (extend-env
-   *prim-proc-names*
-   (list->vector (map prim-proc
-	*prim-proc-names*))
-   (empty-env)))
+  (make-init-env))
+
+(define reset-global-env
+ (lambda () (set! init-env (make-init-env))))
 
 (define apply-prim-proc
   (lambda (prim-proc args env)
@@ -417,6 +438,10 @@
         (syntax-expand (expand-or (map syntax-expand bodies)))]
       [begin-exp (bodies)
         (app-exp (lambda-exp '() (map syntax-expand bodies)) '())]
+      [set!-exp (var body)
+        (set!-exp var (syntax-expand body))]
+      [define-exp (var body)
+        (define-exp var (syntax-expand body))]
       [else
         exp])))
 
@@ -437,7 +462,7 @@
     (lit-exp '#f)
       (if (null? (cdr bodies))
         (car bodies)
-        (let-exp (list 'x) (list (car bodies)) (list (if-exp (var-exp 'x) (var-exp 'x) (expand-or (cdr bodies))))))))
+        (let-exp (list '_x) (list (car bodies)) (list (if-exp (var-exp '_x) (var-exp '_x) (expand-or (cdr bodies))))))))
 
 (define (expand-let* vars vals bodies)
   (if (null? (cdr vars))
@@ -519,6 +544,8 @@
         (parse-while datum)]
        [(equal? (1st datum) 'for)
          (parse-for datum)]
+       [(equal? (1st datum) 'define)
+         (parse-define datum)]
        [else
 	(parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
@@ -598,7 +625,7 @@
    [(not (symbol? (2nd datum)))
     (eopl:error 'parse-exp "the first element must be a symbol")]
    [else
-    (set!-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)))]))
+    (set!-exp (2nd datum) (parse-exp (3rd datum)))]))
 
 (define (parse-app datum)
   (app-exp (parse-exp (1st datum)) (map parse-exp (cdr datum))))
@@ -642,6 +669,9 @@
         (if (list? (caar datum))
           (cons (map parse-exp (caar datum)) (parse-cases (cdr datum)))
           (cons (parse-exp (caar datum)) (parse-cases (cdr datum)))))]))
+
+(define (parse-define datum)
+  (define-exp (2nd datum) (parse-exp (3rd datum))))
 
 
 (define (improper-list-map proc list)

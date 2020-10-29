@@ -43,6 +43,8 @@
         (parse-while datum)]
        [(equal? (1st datum) 'for)
          (parse-for datum)]
+       [(equal? (1st datum) 'define)
+         (parse-define datum)]
        [else
 	(parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
@@ -122,7 +124,7 @@
    [(not (symbol? (2nd datum)))
     (eopl:error 'parse-exp "the first element must be a symbol")]
    [else
-    (set!-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)))]))
+    (set!-exp (2nd datum) (parse-exp (3rd datum)))]))
 
 (define (parse-app datum)
   (app-exp (parse-exp (1st datum)) (map parse-exp (cdr datum))))
@@ -166,6 +168,9 @@
         (if (list? (caar datum))
           (cons (map parse-exp (caar datum)) (parse-cases (cdr datum)))
           (cons (parse-exp (caar datum)) (parse-cases (cdr datum)))))]))
+
+(define (parse-define datum)
+  (define-exp (2nd datum) (parse-exp (3rd datum))))
 
 
 (define (improper-list-map proc list)
