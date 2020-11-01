@@ -256,7 +256,7 @@
     (cases proc-val proc-value
 	   [prim-proc (op) (apply-prim-proc op (eval-rands args env) env)]
 	   [closure (vars bodies closure-env)
-		    (let ([new-env (add-lambda-variables-to-enviornment vars args closure-env env)])
+		    (let ([new-env (add-lambda-variables-to-enviornment vars args env env)])
 		      (eval-bodies bodies new-env))]
 	   [else (error 'apply-proc
 			"Attempt to apply bad procedure: ~s"
@@ -270,17 +270,19 @@
         [var-exp (var)
 	       (extend-env (list var) (list->vector (list (map (lambda (x) (eval-exp x env)) args))) '() '() ref-env env)]
         [else
-        (error 'add-lambda-variables-to-enviornment "Not a var-exp in add-lambda-vars")])]
+          (error 'add-lambda-variables-to-enviornment "Not a var-exp in add-lambda-vars")])]
 	  [(list? vars)
       (let ([vars (get-var-exps vars args env)]
-            [refs (get-ref-exp vars args)])
-	           (extend-env (map car vars) (list->vector (map cadr vars)) (map car refs) (map cadr refs) ref-env env))]
+            [refs (get-ref-exps vars args env)])
+	           (extend-env (append (map car vars) (map car (cadr refs))) (list->vector (append (map cadr vars) (map cadr (cadr refs))))
+               (map car (car refs)) (map cadr (car refs)) ref-env env))]
 	  [else
         (let* ([vars (list-of-unknown-vars vars)]
                [args (list-of-unknown-args args (length list-of-vars))]
                [vars (get-var-exps vars args env)]
-               [refs (get-ref-exp vars args)])
-                (extend-env (map car vars) (list->vector (map cadr vars)) (map car refs) (map cadr refs) ref-env env))]))
+               [refs (get-ref-exps vars args env)])
+                (extend-env (append (map car vars) (map car (cadr refs))) (list->vector (append (map cadr vars) (map cadr (cadr refs))))
+                  (map car (car refs)) (map cadr (car refs)) ref-env env))]))
 
 (define (get-var-exps vars args env)
   (if (null? vars)
@@ -291,18 +293,21 @@
       [else
         (get-var-exps (cdr vars) (cdr args) env)])))
 
-(define (get-ref-exp vars args)
+(define (get-ref-exps vars args env)
   (if (null? vars)
-    '()
+    '(() ())
     (cases expression (car vars)
       [ref-exp (var)
         (cases expression (car args)
           [var-exp (arg)
-            (cons (list var arg) (get-ref-exp (cdr vars) (cdr args)))]
+            (let ([ref (get-ref-exps (cdr vars) (cdr args) env)])
+              (list (cons (list var arg) (car ref)) (cadr ref)))]
           [else
-            (error 'get-ref-exp "Not a var-exp in get-ref-exp")])]
+            (let ([ref (get-ref-exps (cdr vars) (cdr args) env)])
+              (list (car ref) (cons (list var (eval-exp (car args) env)) (cadr ref))))])]
       [else
-        (get-ref-exp (cdr vars) (cdr args))])))
+        (get-ref-exps (cdr vars) (cdr args) env)])))
+
 
 
 (define list-of-unknown-vars
