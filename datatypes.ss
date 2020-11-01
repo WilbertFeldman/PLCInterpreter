@@ -4,7 +4,8 @@
 ;Defined all the different datatypes so that the parser can format what it sees into a type specified here.
 (define-datatype expression expression? ;Expression is a datatype. Expression? is a predicate that checks if the obj is an expression.
   [var-exp
-   (id symbol?)]
+   (depth number?)
+   (pos (lambda (x) (or (number? x) (symbol? x)))]
   [lit-exp
    (value literal?)]
   [lambda-exp

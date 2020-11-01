@@ -28,15 +28,21 @@
 
 
 (define apply-env
-  (lambda (env sym global-env)
-    (cases environment env
-	   [empty-env-record ()
-			     (apply-global-env global-env sym)]
-	   [extended-env-record (syms vals env)
-				(let ((pos (list-find-position sym syms)))
-				  (if (number? pos)
-				      (vector-ref vals pos)
-				      (apply-env env sym global-env)))])))
+  (lambda (env depth pos global-env)
+    (cond
+      [(= pos -1) (apply-global-env global-env depth)]
+      [(= depth 0)
+        (cases environment env
+          [extended-env-record (syms vals env)
+            (vector-ref vals pos)]
+          [else
+            (eopl:error 'apply-env "Not extended-env-record")])]
+      [else
+        (cases enviroment env
+          [extended-env-record (syms vals env)
+            (apply-env env (sub1 depth) pos global-env)]
+          [else
+            (eopl:error 'apply-env "Not extended-env-record")])])))
 
 
 (define set-val

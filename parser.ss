@@ -178,6 +178,61 @@
       (cons (proc (car list)) (improper-list-map proc (cdr list)))
       (proc x)))
 
+
+(define (lexical-address lst)
+   (let lexical-address ([exp lst] [stk '()])
+     (cases expression exp
+
+        [var-exp (var)
+         (let ([adr (position var stk)])
+          (if (symbol? (cadr adr))
+              (var-exp -1 (caddr adr))
+              (var-exp (cadr adr) (caddr adr))))]
+        [lambda-exp (vars bodies)
+          (cond
+            [(symbol? vars)
+              (lambda-exp vars (map (lambda (x) (lexical-address x (cons (list vars) stk))) bodies))]
+            [(list? vars)
+              (lambda-exp vars (map (lambda (x) (lexical-address x (cons vars stk))) bodies))]
+            [(not (list? vars))
+              (lambda-exp vars (map (lambda (x) (lexical-address x (cons (improper->proper vars) stk))) bodies))])]
+        [letrec-exp (vars vals bodies)
+           (letrec-exp vars
+                       (map (lambda (exp) (lexical-address exp stk)) vals)
+                       (map (lambda (x) (lexical-address x (cons vars stk))) bodies))]
+        [set!-exp (var val)
+         (set!-exp var (lexical-address val stk))]
+        [if-exp (test body1 body2)
+         (if-exp (lexical-address test stk)
+                 (lexical-address body1 stk)
+                 (lexical-address body2 stk))]
+        [if-one-exp (test body1)
+         (if-exp (lexical-address test stk)
+                 (lexical-address body1 stk))]
+        [define-exp (var exp)
+          (define-exp var (lexical-address exp stk))]
+        [else
+         (map (lambda (lst) (lexical-address lst stk)) exp)])))
+
+
+(define (position var stk)
+  (let position ([var var] [stk stk] [depth 0] [lex-position 0])
+   (cond
+    [(equal? '() stk)
+     (list ': 'free var)]
+    [(equal? '() (car stk))
+     (position var (cdr stk) (add1 depth) 0)]
+    [(equal? var (caar stk))
+     (list ': depth lex-position)]
+    [else
+     (position var (cons (cdar stk) (cdr stk)) depth (add1 lex-position))])))
+
+(define (improper->proper lst)
+  (cond
+    [(pair? lst) (cons (car lst) (improper->proper (cdr lst)))]
+    [else (list lst)]))
+
+
 (define unparse-exp
   (lambda (exp)
     (cases expression exp
