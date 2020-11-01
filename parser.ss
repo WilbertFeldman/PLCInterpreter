@@ -45,33 +45,35 @@
          (parse-for datum)]
        [(equal? (1st datum) 'define)
          (parse-define datum)]
+       [(equal? (1st datum) 'ref)
+         (parse-ref datum)]
        [else
 	(parse-app datum)])]
      [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
 
 (define (valid-vars vars)
   (cond [(list? vars)
-	 (andmap symbol? vars)]
+	 (andmap var? vars)]
 	[(pair? vars)
-	 (improper-list-of-symbols? vars)]
+	 (improper-list-of-vars? vars)]
 	[else
 	 (symbol? vars)]))
 					;4 helpers
 (define (parse-lambda datum)
   (cond [(not (valid-vars (2nd datum)))
-	 (eopl:error 'parse-exp "invalid variables for lambda: ~s" datum)]
+	 (eopl:error 'parse-exp "invalid variables for lambda: ~s")]
 	[(> 3 (length datum))
 	 (eopl:error 'parse-exp "improperly formated lambda expected >2 parts: ~s" datum)]
 	[else
 	 (cond
 	  [(symbol? (2nd datum))
-	   (lambda-exp (2nd datum)
+	   (lambda-exp (parse-exp (2nd datum))
 		       (map parse-exp (cddr datum)))]
 	  [(not (list? (2nd datum)))
-	   (lambda-exp (2nd datum)
+	   (lambda-exp (improper-list-map parse-exp (2nd datum))
 		       (map parse-exp (cddr datum)))]
 	  [else
-	   (lambda-exp (2nd datum)
+	   (lambda-exp (map parse-exp (2nd datum))
 		       (map parse-exp (cddr datum)))])]))
 
 (define (parse-if datum)
@@ -172,11 +174,22 @@
 (define (parse-define datum)
   (define-exp (2nd datum) (parse-exp (3rd datum))))
 
+(define (parse-ref datum)
+  (ref-exp (2nd datum)))
+
 
 (define (improper-list-map proc list)
   (if (pair? x)
       (cons (proc (car list)) (improper-list-map proc (cdr list)))
       (proc x)))
+
+(define (improper-list-of-vars vars)
+  (if (pair? vars)
+    (and (var? (car vars)) (improper-list-of-vars (cdr vars)))
+    (var? vars)))
+
+(define (var? x)
+  (or (and (list? x) (equal? 'ref (car x)) (symbol? (cadr x))) (symbol? x)))
 
 (define unparse-exp
   (lambda (exp)

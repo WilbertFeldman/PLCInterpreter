@@ -8,11 +8,11 @@
   [lit-exp
    (value literal?)]
   [lambda-exp
-   (vars (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
+   (vars (lambda (x) (or ((list-of expression?) x) (improper-list-of-expressions? x) (expression? x))))
    (bodies (list-of expression?))]
-   [if-one-exp
-     (condtion expression?)
-     (body1 expression?)]
+  [if-one-exp
+   (condtion expression?)
+   (body1 expression?)]
   [if-exp
    (condition expression?)
    (body1 expression?)
@@ -59,7 +59,9 @@
     (bodies (list-of expression?))]
   [define-exp
     (val symbol?)
-    (body expression?)])
+    (body expression?)]
+  [ref-exp
+    (var symbol?)])
 
 
 					;type helpers
@@ -71,10 +73,10 @@
 	       [else #f])
 	#f)))
 
-(define (improper-list-of-symbols? list)
+(define (improper-list-of-expressions? list)
   (if (pair? list)
-      (and (symbol? (1st list)) (improper-list-of-symbols? (cdr list)))
-      (symbol? list)))
+      (and (expression? (1st list)) (improper-list-of-expressions? (cdr list)))
+      (expression? list)))
 
 (define (literal? x)
   (and (not (symbol? x)) (or (not (pair? x)) (equal? 'quote (car x)))))
@@ -89,6 +91,9 @@
   (extended-env-record
    (syms (list-of symbol?))
    (vals vector?)
+   (new-env-vars (list-of symbol?))
+   (old-env-vars (list-of symbol?))
+   (ref-env environment?)
    (env environment?)))
 
 					; datatype for procedures.  At first there is only one
@@ -98,7 +103,7 @@
   [prim-proc
    (name symbol?)]
   [closure
-   (args (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
+   (args (lambda (x) (or ((list-of expression?) x) (improper-list-of-expressions? x) (expression? x))))
    (bodies (list-of expression?))
    (env environment?)])
 

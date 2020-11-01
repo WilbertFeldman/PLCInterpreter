@@ -17,11 +17,10 @@
 			     (cadr datum)
 			      datum)]
 	   [var-exp (id)
-		    (apply-env env id init-env)]
+		    (apply-env env id)]
 	   [app-exp (rator rands)
-		    (let ([proc-value (eval-exp rator env)]
-			  [args (eval-rands rands env)])
-		      (apply-proc proc-value args env))]
+		    (let ([proc-value (eval-exp rator env)])
+		      (apply-proc proc-value rands env))]
      [if-one-exp (condition body)
         (if (eval-exp condition env)
             (eval-exp body env))]
@@ -30,7 +29,7 @@
 		       (eval-exp body1 env)
 		       (eval-exp body2 env))]
 	   [let-exp (vars vals bodies)
-		    (let ([new-env (extend-env vars (list->vector (map (lambda (x) (eval-exp x env)) vals)) env)])
+		    (let ([new-env (extend-env vars (list->vector (map (lambda (x) (eval-exp x env)) vals)) '() '() (empty-env) env)])
 		      (eval-bodies bodies new-env))]
      [letrec-exp (vars vals bodies)
      (eval-bodies bodies (extend-env-recursively vars vals env))]
@@ -62,24 +61,56 @@
 (define apply-proc
   (lambda (proc-value args env)
     (cases proc-val proc-value
-	   [prim-proc (op) (apply-prim-proc op args env)]
-	   [closure (vars bodies env)
-		    (let ([new-env (add-lambda-variables-to-enviornment vars args env)])
+	   [prim-proc (op) (apply-prim-proc op (eval-rands args env) env)]
+	   [closure (vars bodies closure-env)
+		    (let ([new-env (add-lambda-variables-to-enviornment vars args closure-env env)])
 		      (eval-bodies bodies new-env))]
 	   [else (error 'apply-proc
 			"Attempt to apply bad procedure: ~s"
 			proc-value)])))
 
 ;; I want a better name for this
-(define (add-lambda-variables-to-enviornment vars args env)
+(define (add-lambda-variables-to-enviornment vars args ref-env env)
   (cond
-    [(symbol? vars)
-	   (extend-env (list vars) (list->vector (list args)) env)]
+    [(expression? vars)
+      (cases expression vars
+        [var-exp (var)
+	       (extend-env (list var) (list->vector (list (map (lambda (x) (eval-exp x env)) args))) '() '() ref-env env)]
+        [else
+        (error 'add-lambda-variables-to-enviornment "Not a var-exp in add-lambda-vars")])]
 	  [(list? vars)
-	   (extend-env vars (list->vector args) env)]
+      (let ([vars (get-var-exps vars args env)]
+            [refs (get-ref-exp vars args)])
+	           (extend-env (map car vars) (list->vector (map cadr vars)) (map car refs) (map cadr refs) ref-env env))]
 	  [else
-      (let ([list-of-vars (list-of-unknown-vars vars)])
-        (extend-env list-of-vars (list->vector (list-of-unknown-args args (length list-of-vars))) env))]))
+        (let* ([vars (list-of-unknown-vars vars)]
+               [args (list-of-unknown-args args (length list-of-vars))]
+               [vars (get-var-exps vars args env)]
+               [refs (get-ref-exp vars args)])
+                (extend-env (map car vars) (list->vector (map cadr vars)) (map car refs) (map cadr refs) ref-env env))]))
+
+(define (get-var-exps vars args env)
+  (if (null? vars)
+    '()
+    (cases expression (car vars)
+      [var-exp (var)
+        (cons (list var (eval-exp (car args) env)) (get-var-exps (cdr vars) (cdr args) env))]
+      [else
+        (get-var-exps (cdr vars) (cdr args) env)])))
+
+(define (get-ref-exp vars args)
+  (if (null? vars)
+    '()
+    (cases expression (car vars)
+      [ref-exp (var)
+        (cases expression (car args)
+          [var-exp (arg)
+            (cons (list var arg) (get-ref-exp (cdr vars) (cdr args)))]
+          [else
+            (error 'get-ref-exp "Not a var-exp in get-ref-exp")])]
+      [else
+        (get-ref-exp (cdr vars) (cdr args))])))
+
 
 (define list-of-unknown-vars
   (lambda (vars)
@@ -105,11 +136,13 @@
 
 (define make-init-env
   (lambda ()
-   (extend-env
+   (extended-env-record
     *prim-proc-names*
     (list->vector (map prim-proc
    *prim-proc-names*))
-    (empty-env))))
+   '()
+   '()
+    (empty-env) (empty-env))))
 
 (define init-env
   (make-init-env))
@@ -214,105 +247,6 @@
     (let ([answer (top-level-eval (parse-exp (read)))])
       (eopl:pretty-print answer) (newline)
       (rep))))
-
-;Transforming more complex procedures to "core forms" (a.k.a. things you NEED in Scheme)
-;So that you can deal with less cases in eval-exp
-(define syntax-expand
-  (lambda (exp)
-    (cases expression exp
-      [lambda-exp (vals bodies)
-        (lambda-exp vals (map syntax-expand bodies))]
-      [if-one-exp (condition body)
-        (if-one-exp (syntax-expand condition)
-          (syntax-expand body))]
- 	    [if-exp (condition body1 body2)
- 		   (if-exp (syntax-expand condition)
- 		       (syntax-expand body1)
- 		       (syntax-expand body2))]
-      [let-exp (vars vals bodies)
-        (app-exp (lambda-exp vars (map syntax-expand bodies)) (map syntax-expand vals))]
-      [let*-exp (vars vals bodies)
-        (syntax-expand (expand-let* vars vals bodies))]
-      [letrec-exp (vars vals bodies)
-        (letrec-exp vars (map syntax-expand vals) (map syntax-expand bodies))]
-      [namedlet-exp (name vars vals bodies)
-        (syntax-expand (expand-named-let name vars vals bodies))]
-      [app-exp (rator rands)
-        (app-exp (syntax-expand rator) (map syntax-expand rands))]
-      [while-exp (conds bodies)
-        (while-exp (syntax-expand conds) (map syntax-expand bodies))]
-      [cond-exp (conds bodies)
-        (syntax-expand (expand-cond (map syntax-expand conds) (map (lambda (x) (map syntax-expand x)) bodies)))]
-      [case-exp (exps vals bodies)
-        (syntax-expand (expand-case (syntax-expand exps)
-          (map (lambda (x)
-            (if (expression? x)
-              (syntax-expand x)
-              (map syntax-expand x))) vals)
-          (map (lambda (x) (map syntax-expand x)) bodies)))]
-      [and-exp (bodies)
-        (syntax-expand (expand-and (map syntax-expand bodies)))]
-      [or-exp (bodies)
-        (syntax-expand (expand-or (map syntax-expand bodies)))]
-      [begin-exp (bodies)
-        (app-exp (lambda-exp '() (map syntax-expand bodies)) '())]
-      [set!-exp (var body)
-        (set!-exp var (syntax-expand body))]
-      [define-exp (var body)
-        (define-exp var (syntax-expand body))]
-      [else
-        exp])))
-
-;Helpers for syntax expand
-
-(define (expand-named-let name vars vals bodies)
-  (app-exp (letrec-exp (list name) (list (lambda-exp vars bodies)) (list (var-exp name))) vals))
-
-(define (expand-and bodies)
-  (if (null? bodies)
-    (lit-exp '#t)
-      (if (null? (cdr bodies))
-        (car bodies)
-        (let-exp (list 'x) (list (car bodies)) (list (if-exp (var-exp 'x) (expand-and (cdr bodies)) (lit-exp '#f)))))))
-
-(define (expand-or bodies)
-  (if (null? bodies)
-    (lit-exp '#f)
-      (if (null? (cdr bodies))
-        (car bodies)
-        (let-exp (list '_x) (list (car bodies)) (list (if-exp (var-exp '_x) (var-exp '_x) (expand-or (cdr bodies))))))))
-
-(define (expand-let* vars vals bodies)
-  (if (null? (cdr vars))
-    (let-exp (list (car vars)) (list (car vals)) bodies)
-    (let-exp (list (car vars)) (list (car vals)) (list (expand-let* (cdr vars) (cdr vals) bodies)))))
-
-(define (expand-cond conds bodies)
-  (if (null? (cdr bodies))
-    (cases expression (car conds)
-      [else-exp ()
-        (if-one-exp (lit-exp '#t) (begin-exp (car bodies)))]
-      [else
-        (if-one-exp (car conds) (begin-exp (car bodies)))])
-    (if-exp (car conds) (begin-exp (car bodies)) (expand-cond (cdr conds) (cdr bodies)))))
-
-(define (expand-case exps vals bodies)
-  (if (null? (cdr bodies))
-    (if (expression? (car vals))
-      (cases expression (car vals)
-        [else-exp ()
-          (if-one-exp (lit-exp '#t) (begin-exp (car bodies)))]
-        [else
-          (if-one-exp (app-exp (var-exp 'equal?) (list exps (car vals))) (begin-exp (car bodies)))])
-      (if-one-exp (app-exp (var-exp 'member) (list exps (app-exp (var-exp 'list) (car vals)))) (begin-exp (car bodies))))
-    (if (expression? (car vals))
-      (cases expression (car vals)
-        [else-exp ()
-          (if-exp (lit-exp '#t) (begin-exp (car bodies)) (expand-case exps (cdr vals) (cdr bodies)))]
-        [else
-          (if-exp (app-exp (var-exp 'equal?) (list exps (car vals))) (begin-exp (car bodies)) (expand-case exps (cdr vals) (cdr bodies)))])
-      (if-exp (app-exp (var-exp 'member) (list exps (app-exp (var-exp 'list) (car vals)))) (begin-exp (car bodies)) (expand-case exps (cdr vals) (cdr bodies))))))
-
 
 ;This is the start.
 (define eval-one-exp
