@@ -58,19 +58,3 @@
          (eopl:error 'env "Wrong2")]
       [extended-env-record (syms vals env)
         (set! init-env (extended-env-record (cons var syms) (list->vector (cons val (vector->list vals))) (empty-env)))])))
-
-
-(define extend-env-recursively
- (lambda (vars vals old-env)
-   (let ([len (length vars)])
-     (let ([vec (make-vector len)])
-       (let ([env (extended-env-record
-                   vars vec old-env)])
-         (for-each
-            (lambda (pos val)
-              (vector-set! vec
-                           pos
-                           (eval-exp val env)))
-            (iota len)
-            vals)
-          env)))))
