@@ -30,7 +30,7 @@
 (define apply-env
   (lambda (env depth pos global-env)
     (cond
-      [(= pos -1) (apply-global-env global-env depth)]
+      [(= depth -1) (apply-global-env global-env pos)]
       [(= depth 0)
         (cases environment env
           [extended-env-record (syms vals env)
@@ -38,7 +38,7 @@
           [else
             (eopl:error 'apply-env "Not extended-env-record")])]
       [else
-        (cases enviroment env
+        (cases environment env
           [extended-env-record (syms vals env)
             (apply-env env (sub1 depth) pos global-env)]
           [else

@@ -13,7 +13,7 @@
  		       (syntax-expand body1)
  		       (syntax-expand body2))]
       [let-exp (vars vals bodies)
-        (app-exp (lambda-exp (map var-exp vars) (map syntax-expand bodies)) (map syntax-expand vals))]
+        (app-exp (lambda-exp vars (map syntax-expand bodies)) (map syntax-expand vals))]
       [let*-exp (vars vals bodies)
         (syntax-expand (expand-let* vars vals bodies))]
       [letrec-exp (vars vals bodies)

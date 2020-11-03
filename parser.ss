@@ -182,12 +182,13 @@
 (define (lexical-address lst)
    (let lexical-address ([exp lst] [stk '()])
      (cases expression exp
-
         [var-exp (var)
          (let ([adr (position var stk)])
           (if (symbol? (cadr adr))
-              (var-exp -1 (caddr adr))
-              (var-exp (cadr adr) (caddr adr))))]
+              (address-exp -1 (caddr adr))
+              (address-exp (cadr adr) (caddr adr))))]
+        [app-exp (rator rands)
+          (app-exp (lexical-address rator stk) (map (lambda (x) (lexical-address x stk)) rands))]
         [lambda-exp (vars bodies)
           (cond
             [(symbol? vars)
@@ -198,7 +199,7 @@
               (lambda-exp vars (map (lambda (x) (lexical-address x (cons (improper->proper vars) stk))) bodies))])]
         [letrec-exp (vars vals bodies)
            (letrec-exp vars
-                       (map (lambda (exp) (lexical-address exp stk)) vals)
+                       (map (lambda (exp) (lexical-address exp (cons vars stk))) vals)
                        (map (lambda (x) (lexical-address x (cons vars stk))) bodies))]
         [set!-exp (var val)
          (set!-exp var (lexical-address val stk))]
@@ -207,12 +208,12 @@
                  (lexical-address body1 stk)
                  (lexical-address body2 stk))]
         [if-one-exp (test body1)
-         (if-exp (lexical-address test stk)
+         (if-one-exp (lexical-address test stk)
                  (lexical-address body1 stk))]
         [define-exp (var exp)
           (define-exp var (lexical-address exp stk))]
         [else
-         (map (lambda (lst) (lexical-address lst stk)) exp)])))
+         exp])))
 
 
 (define (position var stk)

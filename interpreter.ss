@@ -16,7 +16,7 @@
 		    (if (pair? datum)
 			     (cadr datum)
 			      datum)]
-	   [var-exp (depth pos)
+	   [address-exp (depth pos)
 		    (apply-env env depth pos init-env)]
 	   [app-exp (rator rands)
 		    (let ([proc-value (eval-exp rator env)]
@@ -217,4 +217,4 @@
 
 ;This is the start.
 (define eval-one-exp
-  (lambda (x) (top-level-eval (syntax-expand (parse-exp x)))))
+  (lambda (x) (top-level-eval (lexical-address (syntax-expand (parse-exp x))))))

@@ -3,14 +3,16 @@
 
 ;Defined all the different datatypes so that the parser can format what it sees into a type specified here.
 (define-datatype expression expression? ;Expression is a datatype. Expression? is a predicate that checks if the obj is an expression.
-  [var-exp
+  [address-exp
    (depth number?)
-   (pos (lambda (x) (or (number? x) (symbol? x)))]
+   (pos (lambda (x) (or (number? x) (symbol? x))))]
+  [var-exp
+    (id symbol?)]
   [lit-exp
    (value literal?)]
-  [lambda-exp
-   (vars (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
-   (bodies (list-of expression?))]
+     [lambda-exp
+      (vars (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
+      (bodies (list-of expression?))]
    [if-one-exp
      (condtion expression?)
      (body1 expression?)]
@@ -99,7 +101,7 @@
   [prim-proc
    (name symbol?)]
   [closure
-   (args (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
+   (args (lambda (x) #t))
    (bodies (list-of expression?))
    (env environment?)])
 

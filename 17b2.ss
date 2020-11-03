@@ -3,14 +3,16 @@
 
 ;Defined all the different datatypes so that the parser can format what it sees into a type specified here.
 (define-datatype expression expression? ;Expression is a datatype. Expression? is a predicate that checks if the obj is an expression.
-  [var-exp
+  [address-exp
    (depth number?)
-   (pos (lambda (x) (or (number? x) (symbol? x)))]
+   (pos (lambda (x) (or (number? x) (symbol? x))))]
+  [var-exp
+    (id symbol?)]
   [lit-exp
    (value literal?)]
-  [lambda-exp
-   (vars (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
-   (bodies (list-of expression?))]
+     [lambda-exp
+      (vars (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
+      (bodies (list-of expression?))]
    [if-one-exp
      (condtion expression?)
      (body1 expression?)]
@@ -99,7 +101,7 @@
   [prim-proc
    (name symbol?)]
   [closure
-   (args (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
+   (args (lambda (x) #t))
    (bodies (list-of expression?))
    (env environment?)])
 
@@ -137,7 +139,7 @@
 (define apply-env
   (lambda (env depth pos global-env)
     (cond
-      [(= pos -1) (apply-global-env global-env depth)]
+      [(= depth -1) (apply-global-env global-env pos)]
       [(= depth 0)
         (cases environment env
           [extended-env-record (syms vals env)
@@ -145,7 +147,7 @@
           [else
             (eopl:error 'apply-env "Not extended-env-record")])]
       [else
-        (cases enviroment env
+        (cases environment env
           [extended-env-record (syms vals env)
             (apply-env env (sub1 depth) pos global-env)]
           [else
@@ -202,7 +204,7 @@
  		       (syntax-expand body1)
  		       (syntax-expand body2))]
       [let-exp (vars vals bodies)
-        (app-exp (lambda-exp (map var-exp vars) (map syntax-expand bodies)) (map syntax-expand vals))]
+        (app-exp (lambda-exp vars (map syntax-expand bodies)) (map syntax-expand vals))]
       [let*-exp (vars vals bodies)
         (syntax-expand (expand-let* vars vals bodies))]
       [letrec-exp (vars vals bodies)
@@ -302,7 +304,7 @@
 		    (if (pair? datum)
 			     (cadr datum)
 			      datum)]
-	   [var-exp (depth pos)
+	   [address-exp (depth pos)
 		    (apply-env env depth pos init-env)]
 	   [app-exp (rator rands)
 		    (let ([proc-value (eval-exp rator env)]
@@ -503,7 +505,7 @@
 
 ;This is the start.
 (define eval-one-exp
-  (lambda (x) (top-level-eval (syntax-expand (parse-exp x)))))
+  (lambda (x) (top-level-eval (lexical-address (syntax-expand (parse-exp x))))))
 (define 1st car)
 (define 2nd cadr)
 (define 3rd caddr)
@@ -688,12 +690,13 @@
 (define (lexical-address lst)
    (let lexical-address ([exp lst] [stk '()])
      (cases expression exp
-
         [var-exp (var)
          (let ([adr (position var stk)])
           (if (symbol? (cadr adr))
-              (var-exp -1 (caddr adr))
-              (var-exp (cadr adr) (caddr adr))))]
+              (address-exp -1 (caddr adr))
+              (address-exp (cadr adr) (caddr adr))))]
+        [app-exp (rator rands)
+          (app-exp (lexical-address rator stk) (map (lambda (x) (lexical-address x stk)) rands))]
         [lambda-exp (vars bodies)
           (cond
             [(symbol? vars)
@@ -704,7 +707,7 @@
               (lambda-exp vars (map (lambda (x) (lexical-address x (cons (improper->proper vars) stk))) bodies))])]
         [letrec-exp (vars vals bodies)
            (letrec-exp vars
-                       (map (lambda (exp) (lexical-address exp stk)) vals)
+                       (map (lambda (exp) (lexical-address exp (cons vars stk))) vals)
                        (map (lambda (x) (lexical-address x (cons vars stk))) bodies))]
         [set!-exp (var val)
          (set!-exp var (lexical-address val stk))]
@@ -713,12 +716,12 @@
                  (lexical-address body1 stk)
                  (lexical-address body2 stk))]
         [if-one-exp (test body1)
-         (if-exp (lexical-address test stk)
+         (if-one-exp (lexical-address test stk)
                  (lexical-address body1 stk))]
         [define-exp (var exp)
           (define-exp var (lexical-address exp stk))]
         [else
-         (map (lambda (lst) (lexical-address lst stk)) exp)])))
+         exp])))
 
 
 (define (position var stk)
