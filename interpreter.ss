@@ -5,7 +5,7 @@
 ;Creates the first empty environment
 (define top-level-eval
   (lambda (form)
-    (eval-exp form (empty-env))))
+    (eval-exp-cps form (empty-env) (lambda (x) x))))
 
 
 (define apply-k
@@ -23,52 +23,69 @@
       [lit-exp (datum)
 		    (if (pair? datum)
 			     (apply-k k (cadr datum))
-			     (apply-k k datum)]
+			     (apply-k k datum))]
 	   [var-exp (id)
-		    (apply-env env id init-env)]
+		    (apply-k k (apply-env env id init-env))]
 	   [app-exp (rator rands)
-		    (let ([proc-value (eval-exp-cps rator env k)]
-			        [args (eval-rands rands env)])
-		            (apply-proc proc-value args env))]
+        (eval-exp-cps rator env (make-k (lambda (proc-val)
+                                          (eval-rands-cps rands env (make-k (lambda (args)
+                                                                            (apply-proc-cps proc-val args env k)))))))]
      [if-one-exp (condition body)
-        (if (eval-exp condition env)
-            (eval-exp body env))]
+        (eval-exp-cps condition env (make-k (lambda (eval-exp)
+                                                    (if eval-exp
+                                                        (eval-exp-cps body env k)))))]
 	   [if-exp (condition body1 body2)
-		   (if (eval-exp condition env)
-		       (eval-exp body1 env)
-		       (eval-exp body2 env))]
+         (eval-exp-cps condition env (make-k (lambda (eval-exp)
+                                                     (if eval-exp
+                                                         (eval-exp-cps body1 env k)
+                                                         (eval-exp-cps body2 env k)))))]
 	   [lambda-exp (vars bodies)
-		       (closure vars bodies env)]
+		       (apply-k k (closure vars bodies env))]
      [while-exp (conds bodies)
-      (if (eval-exp conds env)
-        (begin (eval-bodies bodies env) (eval-exp exp env)))]
+      (eval-exp-cps conds env (make-k (lambda (eval-exp)
+                                              (if eval-exp
+                                                  (eval-bodies-cps bodies env (make-k (lambda (v)
+                                                                                  (eval-exp-cps exp env k))))))))]
      [set!-exp (var val)
-      (set-val env var (eval-exp val env))]
+      (eval-exp-cps val env (make-k (lambda (eval-exp)
+                                            (apply-k k (set-val env var eval-exp)))))]
      [define-exp (var body)
-      (define-val var (eval-exp body env) init-env)]
+     (eval-exp-cps body env (make-k (lambda (eval-exp)
+                                            (apply-k k (define-val var eval-exp init-env)))))]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 
+(define eval-bodies-cps
+ (lambda (lst env k)
+   (cond
+    [(null? (cdr lst)) (eval-exp-cps (car lst) env k)]
+    [else (eval-exp-cps (car lst) env (make-k (lambda (v)
+                                               (eval-bodies-cps (cdr lst) env k))))])))
 
-(define eval-bodies
-  (lambda (lst env)
-    (cond
-     [(null? (cdr lst)) (eval-exp (car lst) env)]
-     [else (eval-exp (car lst) env) (eval-bodies (cdr lst) env)])))
+(define map-cps
+  (lambda (proc-cps L k)
+    (if (null? L)
+      (apply-k k '())
+      (if (pair? L)
+        (proc-cps (car L)
+                  (make-k (lambda (proc)
+                                  (map-cps proc-cps (cdr L)
+                                                    (make-k (lambda (mapped-cdr)
+                                                                    (apply-k k (cons proc mapped-cdr))))))))))))
 
-(define eval-rands
-  (lambda (rands env)
-    (map (lambda (x) (eval-exp x env)) rands)))
+(define eval-rands-cps
+  (lambda (rands env k)
+    (map-cps (lambda (x cps-proc) (eval-exp-cps x env cps-proc)) rands k)))
 
 
 ;Applying the actual procedure to elements.
-(define apply-proc
-  (lambda (proc-value args env)
+(define apply-proc-cps
+  (lambda (proc-value args env k)
     (cases proc-val proc-value
-	   [prim-proc (op) (apply-prim-proc op args env)]
+	   [prim-proc (op) (apply-prim-proc-cps op args env k)]
 	   [closure (vars bodies env)
 		    (let ([new-env (add-lambda-variables-to-enviornment vars args env)])
-		      (eval-bodies bodies new-env))]
+		      (eval-bodies-cps bodies new-env k))]
 	   [else (error 'apply-proc
 			"Attempt to apply bad procedure: ~s"
 			proc-value)])))
@@ -120,70 +137,70 @@
 (define reset-global-env
  (lambda () (set! init-env (make-init-env))))
 
-(define apply-prim-proc
-  (lambda (prim-proc args env)
+(define apply-prim-proc-cps
+  (lambda (prim-proc args env k)
     (case prim-proc
-      [(+) (apply + args)]
-      [(-) (apply - args)]
-      [(*) (apply * args)]
-      [(/) (apply / args)]
-      [(add1) (apply add1 args)]
-      [(sub1) (apply sub1 args)]
-      [(=) (apply = args)]
-      [(<) (apply < args)]
-      [(>) (apply > args)]
-      [(<=) (apply <= args)]
-      [(>=) (apply >= args)]
-      [(not) (apply not args)]
-      [(zero?) (apply zero? args)]
-      [(cons) (apply cons args)]
-      [(append) (apply append args)]
-      [(car) (apply car args)]
-      [(cdr) (apply cdr args)]
-      [(list) args]
-      [(null?) (apply null? args)]
-      [(assq) (apply assq args)]
-      [(eq?) (apply eq? args)]
-      [(eqv?) (apply eqv? args)]
-      [(equal?) (apply equal? args)]
-      [(atom?) (apply atom? args)]
-      [(length) (apply length args)]
-      [(list->vector) (apply list->vector args)]
-      [(list?) (apply list? args)]
-      [(list-tail) (apply list-tail args)]
-      [(pair?) (apply pair? args)]
-      [(procedure?) (apply proc-val? args)]
-      [(vector->list) (apply vector->list args)]
-      [(vector) (apply vector args)]
-      [(make-vector) (apply make-vector args)]
-      [(vector-ref) (apply vector-ref args)]
-      [(vector?) (apply vector? args)]
-      [(number?) (apply number? args)]
-      [(symbol?) (apply symbol? args)]
-      [(set-car!) (apply set-car! args)]
-      [(set-cdr!) (apply set-cdr! args)]
-      [(vector-set!) (apply vector-set! args)]
-      [(display) (apply display args)]
-      [(newline) (apply newline args)]
-      [(caar) (apply caar args)]
-      [(cadr) (apply cadr args)]
-      [(cdar) (apply cdar args)]
-      [(cddr) (apply cddr args)]
-      [(caaar) (apply caaar args)]
-      [(caadr) (apply caadr args)]
-      [(cadar) (apply cadar args)]
-      [(cdaar) (apply cdaar args)]
-      [(caddr) (apply caddr args)]
-      [(cdadr) (apply cdadr args)]
-      [(cddar) (apply cddar args)]
-      [(cdddr) (apply cdddr args)]
-      [(map) (our-map (1st args) env (2nd args) (cddr args))]
-      [(apply) (our-apply (1st args) env (last args) (all-but-last (cdr args)))]
-      [(quotient) (apply quotient args)]
-      [(member) (apply member args)]
-      [(product) (apply product args)]
-      [(union) (apply union args)]
-      [else (error 'apply-prim-proc
+      [(+) (apply-k k (apply + args))]
+      [(-) (apply-k k (apply - args))]
+      [(*) (apply-k k (apply * args))]
+      [(/) (apply-k k (apply / args))]
+      [(add1) (apply-k k (apply add1 args))]
+      [(sub1) (apply-k k (apply sub1 args))]
+      [(=) (apply-k k (apply = args))]
+      [(<) (apply-k k (apply < args))]
+      [(>) (apply-k k (apply > args))]
+      [(<=) (apply-k k (apply <= args))]
+      [(>=) (apply-k k (apply >= args))]
+      [(not) (apply-k k (apply not args))]
+      [(zero?) (apply-k k (apply zero? args))]
+      [(cons) (apply-k k (apply cons args))]
+      [(append) (apply-k k (apply append args))]
+      [(car) (apply-k k (apply car args))]
+      [(cdr) (apply-k k (apply cdr args))]
+      [(list) (apply-k k args)]
+      [(null?) (apply-k k (apply null? args))]
+      [(assq) (apply-k k (apply assq args))]
+      [(eq?) (apply-k k (apply eq? args))]
+      [(eqv?) (apply-k k (apply eqv? args))]
+      [(equal?) (apply-k k (apply equal? args))]
+      [(atom?) (apply-k k (apply atom? args))]
+      [(length) (apply-k k (apply length args))]
+      [(list->vector) (apply-k k (apply list->vector args))]
+      [(list?) (apply-k k (apply list? args))]
+      [(list-tail) (apply-k k (apply list-tail args))]
+      [(pair?) (apply-k k (apply pair? args))]
+      [(procedure?) (apply-k k (apply proc-val? args))]
+      [(vector->list) (apply-k k (apply vector->list args))]
+      [(vector) (apply-k k (apply vector args))]
+      [(make-vector) (apply-k k (apply make-vector args))]
+      [(vector-ref) (apply-k k (apply vector-ref args))]
+      [(vector?) (apply-k k (apply vector? args))]
+      [(number?) (apply-k k (apply number? args))]
+      [(symbol?) (apply-k k (apply symbol? args))]
+      [(set-car!) (apply-k k (apply set-car! args))]
+      [(set-cdr!) (apply-k k (apply set-cdr! args))]
+      [(vector-set!) (apply-k k (apply vector-set! args))]
+      [(display) (apply-k k (apply display args))]
+      [(newline) (apply-k k (apply newline args))]
+      [(caar) (apply-k k (apply caar args))]
+      [(cadr) (apply-k k (apply cadr args))]
+      [(cdar) (apply-k k (apply cdar args))]
+      [(cddr) (apply-k k (apply cddr args))]
+      [(caaar) (apply-k k (apply caaar args))]
+      [(caadr) (apply-k k (apply caadr args))]
+      [(cadar) (apply-k k (apply cadar args))]
+      [(cdaar) (apply-k k (apply cdaar args))]
+      [(caddr) (apply-k k (apply caddr args))]
+      [(cdadr) (apply-k k (apply cdadr args))]
+      [(cddar) (apply-k k (apply cddar args))]
+      [(cdddr) (apply-k k (apply cdddr args))]
+      [(map) (our-map-cps (1st args) (2nd args) env k)]
+      [(apply) (apply-k k (our-apply-cps (1st args) env (last args) (all-but-last (cdr args)) k))]
+      [(quotient) (apply-k k (apply quotient args))]
+      [(member) (apply-k k (apply member args))]
+      [(product) (apply-k k (apply product args))]
+      [(union) (apply-k k (apply union args))]
+      [else (error 'apply-prim-proc-cps
 		   "Bad primitive procedure name: ~s"
 		   prim-op)])))
 ;
@@ -196,15 +213,18 @@
       (cond [(null? s1) s2]
             [(memq (car s1) s2) (loop (cdr s1))]
             [else (cons (car s1) (loop (cdr s1)))]))))
-(define our-map
-  (lambda (proc env lst lsts)
-    (if (null? lst)  '()
-          (cons (apply-proc proc (cons (car lst) (map car lsts)) env)
-            (our-map proc env (cdr lst) (map cdr lsts))))))
 
-(define our-apply
-  (lambda (proc env lst objs)
-    (apply-proc proc (append objs lst) env)))
+(define our-map-cps
+  (lambda (proc ls env k)
+    (if (null? ls)
+      (apply-k k '())
+      (apply-proc-cps proc (car ls) env (make-k (lambda (var)
+                                        (our-map-cps proc (cdr ls) env (make-k (lambda (map)
+                                                                        (apply-k k (cons var map)))))))))))
+
+(define our-apply-cps
+  (lambda (proc env lst objs k)
+    (apply-proc-cps proc (append objs lst) env k)))
 
 (define last
   (lambda (lst)
