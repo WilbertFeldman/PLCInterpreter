@@ -266,17 +266,86 @@
 ;"Interpreted" means that it executes the code immediately without translating human-readable code to computer-readable bits.
 
 ;Creates the first empty environment
+
+
+(define make-k
+  (lambda (v) v))
+
 (define top-level-eval
   (lambda (form)
-    (eval-exp-cps form (empty-env) (lambda (x) x))))
+    (eval-exp-cps form (empty-env) (init-k))))
+
+  (define-datatype continuation continuation?
+    [init-k]
+    [list-k]
+    [not-k]
+    [app-exp-1-k
+      (rands (list-of expression?))
+      (env environment?)
+      (k continuation?)]
+    [app-exp-2-k
+      (proc-val proc-val?)
+      (env environment?)
+      (k continuation?)]
+    [if-one-exp-k
+      (body expression?)
+      (env environment?)
+      (k continuation?)]
+    [if-exp-k
+      (body1 expression?)
+      (body2 expression?)
+      (env environment?)
+      (k continuation?)]
+    [while-exp-k-1
+      (bodies (list-of expression?))
+      (env environment?)
+      (k continuation?)]
+    [while-exp-k-2
+      (exp expression?)
+      (env environment?)
+      (k continuation?)]
+    [set!-exp-k
+      (var symbol?)
+      (k continuation?)]
+    [define-exp-k
+      (var symbol?)
+      (k continuation?)]
+    [eval-bodies-cps-k
+      (lst (list-of expression?))
+      (env environment?)
+      (k continuation?)]
+    [map-cps-k-1
+    (L list?)
+    (k continuation?)]
+    [map-cps-k-2
+    (proc proc-val?)
+    (k continuation?)])
 
 
 (define apply-k
   (lambda (k v)
-    (k v)))
+    (if (not (continuation? k))
+      (k v)
+      (cases continuation k
+        [init-k () v]
+        [list-k () (list v)]
+        [not-k () (not v)]
+        [app-exp-1-k (rands env k) (eval-rands-cps rands env (app-exp-2-k v env k))]
+        [app-exp-2-k (proc-val env k) (apply-proc-cps proc-val v env k)]
+        [if-one-exp-k (body env k) (if v
+                                    (eval-exp-cps body env k))]
+        [if-exp-k (body1 body2 env k) (if v
+                                        (eval-exp-cps body1 env k)
+                                        (eval-exp-cps body2 env k))]
+        [while-exp-k-1 (bodies env k) (if v
+                                        (eval-bodies-cps bodies env (while-exp-2-k exp env k)))]
+        [while-exp-k-2 (exp env k) (eval-exp-cps exp env k)]
+        [set!-exp-k (var k) (apply-k k (set-val env var v))]
+        [define-exp-k (var k) (apply-k k (define-val var v init-env))]
+        [eval-bodies-cps-k (lst env k) (eval-bodies-cps-k (cdr lst) env k)]
+        [map-cps-k-1 (L k) (map-cps v (cdr L) (map-cps-k-2 v k))]
+        [map-cps-k-2 (proc k) (apply-k k (cons proc v))]))))
 
-(define make-k
-  (lambda (v) v))
 
 ;Adds variables + values to given assignment. Also does the actual execution of code.
 ;It checks if 'exp' is a certain type (eg. vars, ifs, etc) and then executes based off information provided.
@@ -290,31 +359,19 @@
 	   [var-exp (id)
 		    (apply-k k (apply-env env id init-env))]
 	   [app-exp (rator rands)
-        (eval-exp-cps rator env (make-k (lambda (proc-val)
-                                          (eval-rands-cps rands env (make-k (lambda (args)
-                                                                            (apply-proc-cps proc-val args env k)))))))]
+        (eval-exp-cps rator env (app-exp-1-k rands env k))]
      [if-one-exp (condition body)
-        (eval-exp-cps condition env (make-k (lambda (eval-exp)
-                                                    (if eval-exp
-                                                        (eval-exp-cps body env k)))))]
+        (eval-exp-cps condition env (if-one-exp-k body env k))]
 	   [if-exp (condition body1 body2)
-         (eval-exp-cps condition env (make-k (lambda (eval-exp)
-                                                     (if eval-exp
-                                                         (eval-exp-cps body1 env k)
-                                                         (eval-exp-cps body2 env k)))))]
+         (eval-exp-cps condition env (if-exp-k body1 body2 env k))]
 	   [lambda-exp (vars bodies)
 		       (apply-k k (closure vars bodies env))]
      [while-exp (conds bodies)
-      (eval-exp-cps conds env (make-k (lambda (eval-exp)
-                                              (if eval-exp
-                                                  (eval-bodies-cps bodies env (make-k (lambda (v)
-                                                                                  (eval-exp-cps exp env k))))))))]
+      (eval-exp-cps conds env (while-exp-k-1 bodies env k))]
      [set!-exp (var val)
-      (eval-exp-cps val env (make-k (lambda (eval-exp)
-                                            (apply-k k (set-val env var eval-exp)))))]
+      (eval-exp-cps val env (set!-exp-k var k))]
      [define-exp (var body)
-     (eval-exp-cps body env (make-k (lambda (eval-exp)
-                                            (apply-k k (define-val var eval-exp init-env)))))]
+     (eval-exp-cps body env (define-exp-k var k))]
 	   [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 
@@ -322,19 +379,15 @@
  (lambda (lst env k)
    (cond
     [(null? (cdr lst)) (eval-exp-cps (car lst) env k)]
-    [else (eval-exp-cps (car lst) env (make-k (lambda (v)
-                                               (eval-bodies-cps (cdr lst) env k))))])))
+    [else (eval-exp-cps (car lst) env (eval-bodies-cps-k lst env k))])))
+
 
 (define map-cps
   (lambda (proc-cps L k)
     (if (null? L)
       (apply-k k '())
       (if (pair? L)
-        (proc-cps (car L)
-                  (make-k (lambda (proc)
-                                  (map-cps proc-cps (cdr L)
-                                                    (make-k (lambda (mapped-cdr)
-                                                                    (apply-k k (cons proc mapped-cdr))))))))))))
+        (proc-cps (car L) (map-cps-k-1 L k))))))
 
 (define eval-rands-cps
   (lambda (rands env k)
@@ -457,8 +510,8 @@
       [(cdadr) (apply-k k (apply cdadr args))]
       [(cddar) (apply-k k (apply cddar args))]
       [(cdddr) (apply-k k (apply cdddr args))]
-      [(map) (eval-exp-cps (2nd args) env (make-k (lambda (eval-exp) (our-map-cps (1st args) eval-exp env k))))]
-      [(apply) (apply-k k (our-apply-cps (1st args) env (last args) (all-but-last (cdr args)) k))]
+      [(map) (our-map-cps (1st args) (2nd args) env k)]
+      [(apply) (our-apply-cps (1st args) (cadr args) env k)]
       [(quotient) (apply-k k (apply quotient args))]
       [(member) (apply-k k (apply member args))]
       [(product) (apply-k k (apply product args))]
@@ -466,9 +519,6 @@
       [else (error 'apply-prim-proc-cps
 		   "Bad primitive procedure name: ~s"
 		   prim-op)])))
-;
-; (define apply-cps
-;   (lambda (proc lst k)))
 
 (define union ; s1 and s2 are sets of symbols.
   (lambda (s1 s2)
@@ -481,13 +531,13 @@
   (lambda (proc ls env k)
     (if (null? ls)
       (apply-k k '())
-      (apply-proc-cps proc (car ls) env (make-k (lambda (var)
+      (apply-proc-cps proc (list (car ls)) env (make-k (lambda (var)
                                         (our-map-cps proc (cdr ls) env (make-k (lambda (map)
                                                                         (apply-k k (cons var map)))))))))))
 
 (define our-apply-cps
-  (lambda (proc env lst objs k)
-    (apply-proc-cps proc (append objs lst) env k)))
+  (lambda (proc args env k)
+    (apply-proc-cps proc args env k)))
 
 (define last
   (lambda (lst)
