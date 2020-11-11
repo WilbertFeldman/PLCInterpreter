@@ -100,7 +100,9 @@
   [closure
    (args (lambda (x) (or ((list-of symbol?) x) (improper-list-of-symbols? x) (symbol? x))))
    (bodies (list-of expression?))
-   (env environment?)])
+   (env environment?)]
+  [continuation-proc
+   (arg continuation?)])
 
 
 ; Environment definitions for CSSE 304 Scheme interpreter.
@@ -349,8 +351,8 @@
         [if-exp-k (body1 body2 env k) (if v
                                         (eval-exp-cps body1 env k)
                                         (eval-exp-cps body2 env k))]
-        [while-exp-k-1 (bodies env exp k) (if v
-                                        (eval-bodies-cps bodies env (while-exp-2-k exp env k)))]
+        [while-exp-k-1 (bodies exp env k) (if v
+                                        (eval-bodies-cps bodies env (while-exp-k-2 exp env k)))]
         [while-exp-k-2 (exp env k) (eval-exp-cps exp env k)]
         [set!-exp-k (var env k) (apply-k k (set-val env var v))]
         [define-exp-k (var k) (apply-k k (define-val var v init-env))]
@@ -387,7 +389,7 @@
 	   [lambda-exp (vars bodies)
 		       (apply-k k (closure vars bodies env))]
      [while-exp (conds bodies)
-      (eval-exp-cps conds env (while-exp-k-1 bodies env k))]
+      (eval-exp-cps conds env (while-exp-k-1 bodies exp env k))]
      [set!-exp (var val)
       (eval-exp-cps val env (set!-exp-k var env k))]
      [define-exp (var body)
@@ -421,6 +423,7 @@
 	   [closure (vars bodies env)
 		    (let ([new-env (add-lambda-variables-to-enviornment vars args env)])
 		      (eval-bodies-cps bodies new-env k))]
+     [continuation-proc (k) (apply-k k (car args))]
 	   [else (error 'apply-proc
 			"Attempt to apply bad procedure: ~s"
 			proc-value)])))
@@ -455,7 +458,7 @@
 			      vector-ref vector? number? symbol? set-car! set-cdr!
 			      vector-set! display newline caar cadr cdar cddr caaar
 			      caadr cadar cdaar caddr cdadr cddar cdddr map apply quotient member
-            list-tail product))
+            list-tail product call/cc exit-list))
 
 
 (define make-init-env
@@ -535,9 +538,16 @@
       [(member) (apply-k k (apply member args))]
       [(product) (apply-k k (apply product args))]
       [(union) (apply-k k (apply union args))]
+      [(call/cc) (our-call/cc args env k)]
+      [(exit-list) args]
       [else (error 'apply-prim-proc-cps
 		   "Bad primitive procedure name: ~s"
 		   prim-op)])))
+
+
+(define (our-call/cc args env k)
+  (let [(continuation (continuation-proc k))]
+    (apply-proc-cps (car args) (list continuation) env k)))
 
 (define union ; s1 and s2 are sets of symbols.
   (lambda (s1 s2)

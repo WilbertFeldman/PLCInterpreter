@@ -12,62 +12,458 @@
   (lambda (form)
     (eval-exp-cps form (empty-env) (init-k))))
 
-  (define-datatype continuation continuation?
-    [init-k]
-    [list-k]
-    [not-k]
-    [app-exp-1-k
-      (rands (list-of expression?))
-      (env environment?)
-      (k continuation?)]
-    [app-exp-2-k
-      (proc-val proc-val?)
-      (env environment?)
-      (k continuation?)]
-    [if-one-exp-k
-      (body expression?)
-      (env environment?)
-      (k continuation?)]
-    [if-exp-k
-      (body1 expression?)
-      (body2 expression?)
-      (env environment?)
-      (k continuation?)]
-    [while-exp-k-1
-      (bodies (list-of expression?))
-      (exp expression?)
-      (env environment?)
-      (k continuation?)]
-    [while-exp-k-2
-      (exp expression?)
-      (env environment?)
-      (k continuation?)]
-    [set!-exp-k
-      (var symbol?)
-      (env environment?)
-      (k continuation?)]
-    [define-exp-k
-      (var symbol?)
-      (k continuation?)]
-    [eval-bodies-cps-k
-      (lst (list-of expression?))
-      (env environment?)
-      (k continuation?)]
-    [map-cps-k-1
-    (proc procedure?)
-    (L list?)
-    (k continuation?)]
-    [map-cps-k-2
-    (proc (lambda (x) #t))
-    (k continuation?)]
-    [our-map-cps-k-1
-    (proc proc-val?)
-    (ls (lambda (x) #t))
-    (env environment?)
-    (k continuation?)]
-    [our-map-cps-k-2
-    (var (lambda (x) #t))
-    (k continuation?)])
+(begin
+  (define ignored
+    (define-datatype:datatype-checker&registry-updater
+      'continuation
+      '((init-k) (list-k) (not-k)
+         (app-exp-1-k
+           (rands (list-of expression?))
+           (env environment?)
+           (k continuation?))
+         (app-exp-2-k
+           (proc-val proc-val?)
+           (env environment?)
+           (k continuation?))
+         (if-one-exp-k
+           (body expression?)
+           (env environment?)
+           (k continuation?))
+         (if-exp-k
+           (body1 expression?)
+           (body2 expression?)
+           (env environment?)
+           (k continuation?))
+         (while-exp-k-1
+           (bodies (list-of expression?))
+           (exp expression?)
+           (env environment?)
+           (k continuation?))
+         (while-exp-k-2
+           (exp expression?)
+           (env environment?)
+           (k continuation?))
+         (set!-exp-k
+           (var symbol?)
+           (env environment?)
+           (k continuation?))
+         (define-exp-k (var symbol?) (k continuation?))
+         (eval-bodies-cps-k
+           (lst (list-of expression?))
+           (env environment?)
+           (k continuation?))
+         (map-cps-k-1 (proc procedure?) (L list?) (k continuation?))
+         (map-cps-k-2 (proc (lambda (x) #t)) (k continuation?))
+         (our-map-cps-k-1
+           (proc proc-val?)
+           (ls (lambda (x) #t))
+           (env environment?)
+           (k continuation?))
+         (our-map-cps-k-2 (var (lambda (x) #t)) (k continuation?)))))
+  (define continuation
+    (cons
+      '(init-k list-k not-k app-exp-1-k app-exp-2-k if-one-exp-k if-exp-k
+         while-exp-k-1 while-exp-k-2 set!-exp-k define-exp-k
+         eval-bodies-cps-k map-cps-k-1 map-cps-k-2 our-map-cps-k-1
+         our-map-cps-k-2)
+      '((init-k) (list-k) (not-k) (app-exp-1-k rands env k)
+         (app-exp-2-k proc-val env k) (if-one-exp-k body env k)
+         (if-exp-k body1 body2 env k)
+         (while-exp-k-1 bodies exp env k) (while-exp-k-2 exp env k)
+         (set!-exp-k var env k) (define-exp-k var k)
+         (eval-bodies-cps-k lst env k) (map-cps-k-1 proc L k)
+         (map-cps-k-2 proc k) (our-map-cps-k-1 proc ls env k)
+         (our-map-cps-k-2 var k))))
+  (define continuation?
+    (if (symbol? 'continuation)
+        (lambda args
+          (if (null? args)
+              (define-datatype:report-error
+                'continuation?
+                "expects 1 argument, not 0.")
+              (if (null? (cdr args))
+                  (let ([variant (car args)])
+                    (let ([type-info continuation])
+                      (if (and (pair? type-info) (list? (car type-info)))
+                          (and (pair? variant)
+                               (memq (car variant) (car type-info))
+                               #t)
+                          (define-datatype:report-error
+                            'continuation?
+                            (string-append
+                              "did not get a data type bound to an "
+                              "  appropriate structure: ~s. "
+                              "  This tends to happen when the type name is "
+                              "  bound to a lexical variable.")
+                            'type-name
+                            type-info))))
+                  (define-datatype:report-error
+                    'continuation?
+                    (string-append
+                      "expects 1 argument, not ~s. "
+                      "  With argument list = ~s.")
+                    (length args)
+                    args))))
+        (define-datatype:report-error
+          'continuation
+          "Type name is not a symbol: ~s."
+          'type-name)))
+  (define init-k
+    (let ([expected-length (length '())]
+          [field-names '()]
+          [pred-names '()]
+          [preds (list)])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'init-k
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '() args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'init-k
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'init-k args))))
+  (define list-k
+    (let ([expected-length (length '())]
+          [field-names '()]
+          [pred-names '()]
+          [preds (list)])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'list-k
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '() args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'list-k
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'list-k args))))
+  (define not-k
+    (let ([expected-length (length '())]
+          [field-names '()]
+          [pred-names '()]
+          [preds (list)])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'not-k
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '() args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'not-k
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'not-k args))))
+  (define app-exp-1-k
+    (let ([expected-length (length '(rands env k))]
+          [field-names '(rands env k)]
+          [pred-names '((list-of expression?)
+                         environment?
+                         continuation?)]
+          [preds (list
+                   (lambda (x) ((list-of expression?) x))
+                   (lambda (x) (environment? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'app-exp-1-k
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(rands env k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'app-exp-1-k
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'app-exp-1-k args))))
+  (define app-exp-2-k
+    (let ([expected-length (length '(proc-val env k))]
+          [field-names '(proc-val env k)]
+          [pred-names '(proc-val? environment? continuation?)]
+          [preds (list
+                   (lambda (x) (proc-val? x))
+                   (lambda (x) (environment? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'app-exp-2-k
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(proc-val env k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'app-exp-2-k
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'app-exp-2-k args))))
+  (define if-one-exp-k
+    (let ([expected-length (length '(body env k))]
+          [field-names '(body env k)]
+          [pred-names '(expression? environment? continuation?)]
+          [preds (list
+                   (lambda (x) (expression? x))
+                   (lambda (x) (environment? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'if-one-exp-k
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(body env k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'if-one-exp-k
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'if-one-exp-k args))))
+  (define if-exp-k
+    (let ([expected-length (length '(body1 body2 env k))]
+          [field-names '(body1 body2 env k)]
+          [pred-names '(expression?
+                         expression?
+                         environment?
+                         continuation?)]
+          [preds (list
+                   (lambda (x) (expression? x))
+                   (lambda (x) (expression? x))
+                   (lambda (x) (environment? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'if-exp-k
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(body1 body2 env k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'if-exp-k
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'if-exp-k args))))
+  (define while-exp-k-1
+    (let ([expected-length (length '(bodies exp env k))]
+          [field-names '(bodies exp env k)]
+          [pred-names '((list-of expression?)
+                         expression?
+                         environment?
+                         continuation?)]
+          [preds (list
+                   (lambda (x) ((list-of expression?) x))
+                   (lambda (x) (expression? x))
+                   (lambda (x) (environment? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'while-exp-k-1
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(bodies exp env k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'while-exp-k-1
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'while-exp-k-1 args))))
+  (define while-exp-k-2
+    (let ([expected-length (length '(exp env k))]
+          [field-names '(exp env k)]
+          [pred-names '(expression? environment? continuation?)]
+          [preds (list
+                   (lambda (x) (expression? x))
+                   (lambda (x) (environment? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'while-exp-k-2
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(exp env k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'while-exp-k-2
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'while-exp-k-2 args))))
+  (define set!-exp-k
+    (let ([expected-length (length '(var env k))]
+          [field-names '(var env k)]
+          [pred-names '(symbol? environment? continuation?)]
+          [preds (list
+                   (lambda (x) (symbol? x))
+                   (lambda (x) (environment? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'set!-exp-k
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(var env k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'set!-exp-k
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'set!-exp-k args))))
+  (define define-exp-k
+    (let ([expected-length (length '(var k))]
+          [field-names '(var k)]
+          [pred-names '(symbol? continuation?)]
+          [preds (list
+                   (lambda (x) (symbol? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'define-exp-k
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(var k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'define-exp-k
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'define-exp-k args))))
+  (define eval-bodies-cps-k
+    (let ([expected-length (length '(lst env k))]
+          [field-names '(lst env k)]
+          [pred-names '((list-of expression?)
+                         environment?
+                         continuation?)]
+          [preds (list
+                   (lambda (x) ((list-of expression?) x))
+                   (lambda (x) (environment? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'eval-bodies-cps-k
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(lst env k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'eval-bodies-cps-k
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'eval-bodies-cps-k args))))
+  (define map-cps-k-1
+    (let ([expected-length (length '(proc L k))]
+          [field-names '(proc L k)]
+          [pred-names '(procedure? list? continuation?)]
+          [preds (list
+                   (lambda (x) (procedure? x))
+                   (lambda (x) (list? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'map-cps-k-1
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(proc L k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'map-cps-k-1
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'map-cps-k-1 args))))
+  (define map-cps-k-2
+    (let ([expected-length (length '(proc k))]
+          [field-names '(proc k)]
+          [pred-names '((lambda (x) #t) continuation?)]
+          [preds (list
+                   (lambda (x) ((lambda (x) #t) x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'map-cps-k-2
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(proc k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'map-cps-k-2
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'map-cps-k-2 args))))
+  (define our-map-cps-k-1
+    (let ([expected-length (length '(proc ls env k))]
+          [field-names '(proc ls env k)]
+          [pred-names '(proc-val?
+                         (lambda (x) #t)
+                         environment?
+                         continuation?)]
+          [preds (list
+                   (lambda (x) (proc-val? x))
+                   (lambda (x) ((lambda (x) #t) x))
+                   (lambda (x) (environment? x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'our-map-cps-k-1
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(proc ls env k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'our-map-cps-k-1
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'our-map-cps-k-1 args))))
+  (define our-map-cps-k-2
+    (let ([expected-length (length '(var k))]
+          [field-names '(var k)]
+          [pred-names '((lambda (x) #t) continuation?)]
+          [preds (list
+                   (lambda (x) ((lambda (x) #t) x))
+                   (lambda (x) (continuation? x)))])
+      (lambda args
+        (if (not (= (length args) expected-length))
+            (define-datatype:report-error 'our-map-cps-k-2
+              (string-append
+                "Expected ~s arguments but got ~s arguments."
+                "   Fields are: ~s    Args are: ~s.")
+              expected-length (length args) '(var k) args))
+        (for-each
+          (lambda (a f p pname)
+            (if (not (p a))
+                (define-datatype:report-error 'our-map-cps-k-2
+                  "  Bad ~a field (~s ~s) => #f." f pname a)))
+          args field-names preds pred-names)
+        (cons 'our-map-cps-k-2 args)))))
 
 
 (define apply-k
@@ -86,8 +482,8 @@
         [if-exp-k (body1 body2 env k) (if v
                                         (eval-exp-cps body1 env k)
                                         (eval-exp-cps body2 env k))]
-        [while-exp-k-1 (bodies env exp k) (if v
-                                        (eval-bodies-cps bodies env (while-exp-2-k exp env k)))]
+        [while-exp-k-1 (bodies exp env k) (if v
+                                        (eval-bodies-cps bodies env (while-exp-k-2 exp env k)))]
         [while-exp-k-2 (exp env k) (eval-exp-cps exp env k)]
         [set!-exp-k (var env k) (apply-k k (set-val env var v))]
         [define-exp-k (var k) (apply-k k (define-val var v init-env))]
@@ -124,7 +520,7 @@
 	   [lambda-exp (vars bodies)
 		       (apply-k k (closure vars bodies env))]
      [while-exp (conds bodies)
-      (eval-exp-cps conds env (while-exp-k-1 bodies env k))]
+      (eval-exp-cps conds env (while-exp-k-1 bodies exp env k))]
      [set!-exp (var val)
       (eval-exp-cps val env (set!-exp-k var env k))]
      [define-exp (var body)
@@ -158,6 +554,7 @@
 	   [closure (vars bodies env)
 		    (let ([new-env (add-lambda-variables-to-enviornment vars args env)])
 		      (eval-bodies-cps bodies new-env k))]
+     [continuation-proc (k) (apply-k k (car args))]
 	   [else (error 'apply-proc
 			"Attempt to apply bad procedure: ~s"
 			proc-value)])))
@@ -192,7 +589,7 @@
 			      vector-ref vector? number? symbol? set-car! set-cdr!
 			      vector-set! display newline caar cadr cdar cddr caaar
 			      caadr cadar cdaar caddr cdadr cddar cdddr map apply quotient member
-            list-tail product))
+            list-tail product call/cc exit-list load))
 
 
 (define make-init-env
@@ -272,9 +669,23 @@
       [(member) (apply-k k (apply member args))]
       [(product) (apply-k k (apply product args))]
       [(union) (apply-k k (apply union args))]
+      [(call/cc) (our-call/cc args env k)]
+      [(exit-list) args]
+      [(load) (our-load args)]
       [else (error 'apply-prim-proc-cps
 		   "Bad primitive procedure name: ~s"
 		   prim-op)])))
+
+
+(define (our-call/cc args env k)
+  (let [(continuation (continuation-proc k))]
+    (apply-proc-cps (car args) (list continuation) env k)))
+
+(define (our-load args)
+  (let loop ([file (open-input-file (car args))])
+    (if (not (port-eof? file))
+    (eval-one-exp (get-datum file))
+    (loop file))))
 
 (define union ; s1 and s2 are sets of symbols.
   (lambda (s1 s2)

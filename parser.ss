@@ -2,7 +2,6 @@
 (define 2nd cadr)
 (define 3rd caddr)
 (define 4th cadddr)
-
 ;The parser activates first. This makes human-readable code more familiar to the computer, making it easier to evaluate.
 ;Eval-exp is easier to write thanks to parse-exp.
 (define parse-exp
@@ -37,7 +36,7 @@
         (parse-or datum)]
        [(equal? (1st datum) 'begin)
         (parse-begin datum)]
-       [(equal? (1st datum) 'cond)
+       [(equal? (1st datum) 'cond) 
         (parse-cond datum)]
        [(equal? (1st datum) 'while)
         (parse-while datum)]
@@ -57,6 +56,7 @@
 	[else
 	 (symbol? vars)]))
 					;4 helpers
+
 (define (parse-lambda datum)
   (cond [(not (valid-vars (2nd datum)))
 	 (eopl:error 'parse-exp "invalid variables for lambda: ~s" datum)]
@@ -170,8 +170,9 @@
           (cons (parse-exp (caar datum)) (parse-cases (cdr datum)))))]))
 
 (define (parse-define datum)
-  (define-exp (2nd datum) (parse-exp (3rd datum))))
-
+  (if (list? (2nd datum))
+      (define-exp (car (2nd datum)) (lambda-exp (cdr (2nd datum)) (map parse-exp (cddr datum))))
+      (define-exp (2nd datum) (parse-exp (3rd datum)))))
 
 (define (improper-list-map proc list)
   (if (pair? x)
